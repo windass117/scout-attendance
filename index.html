@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>童軍集會點名</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body class="min-h-screen bg-gray-100">
+  <!-- 頂部工具列 -->
+  <div id="app-toolbar" class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+      <div class="text-sm text-gray-600">
+        <i class="fa-brands fa-github mr-1"></i>
+        <span id="toolbar-repo"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="sync-status" class="text-xs text-gray-500"></span>
+        <button id="refresh-btn" type="button"
+          class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
+          <i class="fa-solid fa-arrows-rotate mr-1"></i>重新載入
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主版：五個支部 -->
+  <div id="home-view" class="min-h-screen flex items-center justify-center p-4 sm:p-8">
+    <main class="w-full max-w-4xl">
+      <header class="text-center mb-8 sm:mb-10">
+        <h1 class="text-2xl sm:text-4xl font-bold text-gray-800">
+          <i class="fa-solid fa-campground text-green-600 mr-2"></i>童軍集會點名
+        </h1>
+        <p class="text-sm sm:text-base text-gray-500 mt-2">
+          <i class="fa-solid fa-hand-pointer mr-1"></i>請選擇支部進入點名表
+        </p>
+      </header>
+      <div id="section-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"></div>
+    </main>
+  </div>
+
+  <!-- 支部詳情：Excel 式出席表 -->
+  <div id="detail-view" class="hidden min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="max-w-[1400px] mx-auto">
+      <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <button id="back-btn" type="button"
+              class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              <i class="fa-solid fa-arrow-left mr-1"></i>返回主版
+            </button>
+            <div>
+              <h2 id="section-title" class="text-xl sm:text-2xl font-bold text-gray-800"></h2>
+              <p class="text-sm text-gray-500">
+                <i class="fa-solid fa-clipboard-check mr-1"></i>出席登記表
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div class="rounded-xl border border-gray-200 p-4 bg-gray-50">
+            <p class="text-sm font-medium text-gray-700 mb-2">
+              <i class="fa-solid fa-user-plus text-blue-600 mr-1"></i>新增成員（只需登記一次）
+            </p>
+            <div class="flex gap-2">
+              <input type="text" id="new-member-input" placeholder="輸入姓名"
+                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+              <button id="add-member-btn" type="button"
+                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
+                <i class="fa-solid fa-plus mr-1"></i>新增
+              </button>
+            </div>
+          </div>
+          <div class="rounded-xl border border-gray-200 p-4 bg-gray-50">
+            <p class="text-sm font-medium text-gray-700 mb-2">
+              <i class="fa-solid fa-calendar-plus text-blue-600 mr-1"></i>新增集會日期
+            </p>
+            <div class="flex gap-2">
+              <input type="date" id="new-date-input"
+                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+              <button id="add-date-btn" type="button"
+                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
+                <i class="fa-solid fa-plus mr-1"></i>新增
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p id="detail-error" class="mb-4 text-sm text-red-600 hidden" role="alert">
+          <i class="fa-solid fa-circle-exclamation mr-1"></i><span id="detail-error-text"></span>
+        </p>
+
+        <div class="rounded-xl border border-gray-300 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table id="attendance-table" class="w-full min-w-max text-sm border-collapse">
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="hidden py-16 text-center text-gray-400">
+            <i class="fa-solid fa-table-cells text-4xl mb-3 block"></i>
+            <p class="text-base">尚未有成員或集會日期</p>
+            <p class="text-sm mt-1">請先新增成員姓名及集會日期</p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <button id="calc-save-btn" type="button"
+            class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors">
+            <i class="fa-solid fa-calculator mr-1"></i>計算出席率並儲存
+          </button>
+          <p id="calc-success" class="text-sm text-green-600 hidden">
+            <i class="fa-solid fa-circle-check mr-1"></i><span id="calc-success-text"></span>
+          </p>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500">
+          <i class="fa-solid fa-circle-info mr-1"></i>提示：資料自動從 GitHub 載入，所有人看到相同內容。點擊格子切換出席／缺席，按「重新載入」取得最新更新。
+        </p>
+
+        <section class="mt-8 border-t border-gray-200 pt-6">
+          <h3 class="text-base font-bold text-gray-800 mb-3">
+            <i class="fa-solid fa-clock-rotate-left text-blue-600 mr-1"></i>計算紀錄 History
+          </h3>
+          <div id="history-empty" class="text-sm text-gray-400 py-4">
+            <i class="fa-solid fa-inbox mr-1"></i>尚無計算紀錄
+          </div>
+          <div id="history-list" class="space-y-3 max-h-80 overflow-y-auto"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 部署時請修改此設定（公開儲存庫，所有人無需登入即可共用資料）
+    const GITHUB_CONFIG = {
+      owner: "windass117",
+      repo: "scout-attendance",
+      branch: "main",
+      path: "data/attendance.json",
+      token: "", // 填入 repo 權限 Token 後，所有人可直接讀寫 GitHub 資料
+    };
+
+    const SECTIONS = [
+      { id: "grasshopper", name: "小童軍", icon: "fa-seedling", color: "bg-green-500" },
+      { id: "cub", name: "幼童軍", icon: "fa-child-reaching", color: "bg-yellow-500" },
+      { id: "scout", name: "童軍", icon: "fa-person-hiking", color: "bg-blue-500" },
+      { id: "venture", name: "深資童軍", icon: "fa-mountain", color: "bg-purple-500" },
+      { id: "rover", name: "樂行童軍", icon: "fa-compass", color: "bg-orange-500" },
+    ];
+
+    let currentSectionId = null;
+    let githubSha = null;
+    let isSyncing = false;
+    let cache = { attendance: {}, history: [] };
+
+    const toolbarRepo = document.getElementById("toolbar-repo");
+    const syncStatus = document.getElementById("sync-status");
+    const refreshBtn = document.getElementById("refresh-btn");
+    const homeView = document.getElementById("home-view");
+    const detailView = document.getElementById("detail-view");
+    const sectionGrid = document.getElementById("section-grid");
+    const sectionTitle = document.getElementById("section-title");
+    const backBtn = document.getElementById("back-btn");
+    const newMemberInput = document.getElementById("new-member-input");
+    const addMemberBtn = document.getElementById("add-member-btn");
+    const newDateInput = document.getElementById("new-date-input");
+    const addDateBtn = document.getElementById("add-date-btn");
+    const detailError = document.getElementById("detail-error");
+    const detailErrorText = document.getElementById("detail-error-text");
+    const tableHead = document.getElementById("table-head");
+    const tableBody = document.getElementById("table-body");
+    const emptyState = document.getElementById("empty-state");
+    const attendanceTable = document.getElementById("attendance-table");
+    const calcSaveBtn = document.getElementById("calc-save-btn");
+    const calcSuccess = document.getElementById("calc-success");
+    const calcSuccessText = document.getElementById("calc-success-text");
+    const historyEmpty = document.getElementById("history-empty");
+    const historyList = document.getElementById("history-list");
+
+    function githubHeaders() {
+      const headers = {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
+      if (GITHUB_CONFIG.token) headers.Authorization = "Bearer " + GITHUB_CONFIG.token;
+      return headers;
+    }
+
+    function getRawUrl() {
+      return "https://raw.githubusercontent.com/" + GITHUB_CONFIG.owner + "/" +
+        GITHUB_CONFIG.repo + "/" + GITHUB_CONFIG.branch + "/" + GITHUB_CONFIG.path;
+    }
+
+    function getContentsApiUrl() {
+      return "https://api.github.com/repos/" + GITHUB_CONFIG.owner + "/" +
+        GITHUB_CONFIG.repo + "/contents/" +
+        encodeURIComponent(GITHUB_CONFIG.path).replace(/%2F/g, "/");
+    }
+
+    function setSyncStatus(text, type) {
+      syncStatus.textContent = text;
+      syncStatus.className = "text-xs " + (type === "error" ? "text-red-600" : type === "success" ? "text-green-600" : "text-gray-500");
+    }
+
+    function showError(message) {
+      detailErrorText.textContent = message;
+      detailError.classList.remove("hidden");
+    }
+
+    function hideError() {
+      detailErrorText.textContent = "";
+      detailError.classList.add("hidden");
+    }
+
+    function decodeBase64Utf8(base64) {
+      const binary = atob(base64.replace(/\n/g, ""));
+      const bytes = Uint8Array.from(binary, function (c) { return c.charCodeAt(0); });
+      return new TextDecoder().decode(bytes);
+    }
+
+    function encodeBase64Utf8(str) {
+      const bytes = new TextEncoder().encode(str);
+      let binary = "";
+      bytes.forEach(function (b) { binary += String.fromCharCode(b); });
+      return btoa(binary);
+    }
+
+    function applyParsedData(parsed) {
+      cache = {
+        attendance: parsed.attendance || {},
+        history: Array.isArray(parsed.history) ? parsed.history : [],
+      };
+      return cache;
+    }
+
+    async function fetchFromGitHub() {
+      if (GITHUB_CONFIG.token) {
+        const url = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
+        const res = await fetch(url, { headers: githubHeaders() });
+        if (res.status === 404) {
+          cache = { attendance: {}, history: [] };
+          githubSha = null;
+          return cache;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          throw new Error(err.message || "無法讀取 GitHub 資料（" + res.status + "）");
+        }
+        const file = await res.json();
+        githubSha = file.sha;
+        return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
+      }
+
+      const localPath = GITHUB_CONFIG.path.startsWith("/") ? GITHUB_CONFIG.path.slice(1) : GITHUB_CONFIG.path;
+      let res = await fetch("./" + localPath);
+      if (!res.ok) res = await fetch(getRawUrl());
+      if (res.status === 404) {
+        cache = { attendance: {}, history: [] };
+        githubSha = null;
+        return cache;
+      }
+      if (!res.ok) throw new Error("無法讀取 GitHub 資料（" + res.status + "）");
+      return applyParsedData(await res.json());
+    }
+
+    async function refreshSha() {
+      if (!GITHUB_CONFIG.token) return;
+      const url = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
+      const res = await fetch(url, { headers: githubHeaders() });
+      if (res.ok) {
+        const file = await res.json();
+        githubSha = file.sha;
+      }
+    }
+
+    async function saveToGitHub(message) {
+      if (isSyncing) return;
+      if (!GITHUB_CONFIG.token) {
+        throw new Error("尚未設定 GitHub Token，無法儲存。請由管理員在程式碼中設定 GITHUB_CONFIG.token");
+      }
+      if (!githubSha) await refreshSha();
+
+      isSyncing = true;
+      setSyncStatus("同步中…", "info");
+
+      const payload = {
+        message: message || "更新童軍點名資料",
+        content: encodeBase64Utf8(JSON.stringify(cache, null, 2)),
+        branch: GITHUB_CONFIG.branch,
+      };
+      if (githubSha) payload.sha = githubSha;
+
+      try {
+        const res = await fetch(getContentsApiUrl(), {
+          method: "PUT",
+          headers: Object.assign({ "Content-Type": "application/json" }, githubHeaders()),
+          body: JSON.stringify(payload),
+        });
+
+        if (res.status === 409) {
+          await fetchFromGitHub();
+          if (currentSectionId) renderTable();
+          else renderHome();
+          throw new Error("資料已被其他人更新，已重新載入最新版本，請再試一次");
+        }
+
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          throw new Error(err.message || "無法寫入 GitHub（" + res.status + "）");
+        }
+
+        const result = await res.json();
+        githubSha = result.content.sha;
+        setSyncStatus("已同步至 GitHub", "success");
+      } catch (err) {
+        setSyncStatus("同步失敗", "error");
+        throw err;
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    async function persistAll(message) {
+      await saveToGitHub(message);
+    }
+
+    function loadHistory() {
+      return cache.history;
+    }
+
+    async function pushHistoryRecord(record) {
+      cache.history.push(record);
+      await persistAll("新增出席率計算紀錄");
+      return cache.history;
+    }
+
+    function loadData() {
+      return cache.attendance;
+    }
+
+    async function saveData(data) {
+      cache.attendance = data;
+      await persistAll("更新點名資料");
+    }
+
+    function getSectionData(sectionId) {
+      const data = loadData();
+      if (!data[sectionId]) {
+        data[sectionId] = { members: [], dates: [], attendance: {} };
+      }
+      return data[sectionId];
+    }
+
+    async function updateSectionData(sectionId, sectionData) {
+      const data = loadData();
+      data[sectionId] = sectionData;
+      await saveData(data);
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr + "T00:00:00");
+      if (isNaN(d.getTime())) return dateStr;
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+      return month + "/" + day + " (" + weekdays[d.getDay()] + ")";
+    }
+
+    function getAttendanceLevel(rate) {
+      if (rate >= 80) return { text: "高", className: "text-green-600" };
+      if (rate >= 50) return { text: "中", className: "text-yellow-600" };
+      return { text: "低", className: "text-red-600" };
+    }
+
+    function calcMemberRate(section, member) {
+      const total = section.dates.length;
+      if (total === 0) return { attended: 0, total: 0, rate: 0, level: getAttendanceLevel(0) };
+      let attended = 0;
+      section.dates.forEach(function (date) {
+        if (section.attendance[member] && section.attendance[member][date] === true) attended += 1;
+      });
+      const rate = (attended / total) * 100;
+      return { attended, total, rate, level: getAttendanceLevel(rate) };
+    }
+
+    function buildCalculationSnapshot(sectionId) {
+      const sectionMeta = SECTIONS.find(function (s) { return s.id === sectionId; });
+      const section = getSectionData(sectionId);
+      const results = section.members.map(function (member) {
+        const stats = calcMemberRate(section, member);
+        return {
+          name: member,
+          attended: stats.attended,
+          total: stats.total,
+          rate: Number(stats.rate.toFixed(1)),
+          level: stats.level.text,
+        };
+      });
+      return {
+        id: Date.now(),
+        calculatedAt: new Date().toISOString(),
+        sectionId: sectionId,
+        sectionName: sectionMeta ? sectionMeta.name : sectionId,
+        results: results,
+      };
+    }
+
+    function renderHistory() {
+      if (!currentSectionId) return;
+      const history = loadHistory().filter(function (item) {
+        return item.sectionId === currentSectionId;
+      }).reverse();
+
+      historyList.innerHTML = "";
+      historyEmpty.classList.toggle("hidden", history.length > 0);
+
+      history.forEach(function (item) {
+        const card = document.createElement("div");
+        card.className = "rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm";
+        const time = new Date(item.calculatedAt);
+        const timeStr = isNaN(time.getTime()) ? item.calculatedAt : time.toLocaleString("zh-Hant");
+        let rowsHtml = "";
+        (item.results || []).forEach(function (r) {
+          rowsHtml +=
+            '<div class="flex justify-between gap-2 py-0.5">' +
+              '<span class="text-gray-700">' + r.name + "</span>" +
+              '<span class="text-gray-600">' + r.attended + "/" + r.total +
+              ' · <span class="font-semibold text-blue-700">' + r.rate + "%</span> · " + r.level + "</span>" +
+            "</div>";
+        });
+        card.innerHTML =
+          '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>' + timeStr + "</p>" +
+          '<div class="space-y-0.5">' + (rowsHtml || '<p class="text-gray-400"><i class="fa-solid fa-user-slash mr-1"></i>無成員資料</p>') + "</div>";
+        historyList.appendChild(card);
+      });
+    }
+
+    function renderHome() {
+      sectionGrid.innerHTML = "";
+      const data = loadData();
+      SECTIONS.forEach(function (section) {
+        const sec = data[section.id] || { members: [], dates: [], attendance: {} };
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition group";
+        card.innerHTML =
+          '<div class="flex items-center gap-3 mb-3">' +
+            '<span class="flex items-center justify-center w-9 h-9 rounded-full ' + section.color + ' text-white">' +
+              '<i class="fa-solid ' + section.icon + '"></i></span>' +
+            '<h3 class="text-lg sm:text-xl font-bold text-gray-800">' + section.name + "</h3></div>" +
+          '<p class="text-sm text-gray-500"><i class="fa-solid fa-users mr-1 text-gray-400"></i>成員：<span class="font-semibold text-gray-700">' + sec.members.length + "</span> 人</p>" +
+          '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-calendar-days mr-1 text-gray-400"></i>集會：<span class="font-semibold text-gray-700">' + sec.dates.length + "</span> 次</p>" +
+          '<p class="mt-4 text-sm font-medium text-blue-600 group-hover:text-blue-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入點名表</p>';
+        card.addEventListener("click", function () { openSection(section.id); });
+        sectionGrid.appendChild(card);
+      });
+    }
+
+    function openSection(sectionId) {
+      currentSectionId = sectionId;
+      const section = SECTIONS.find(function (s) { return s.id === sectionId; });
+      sectionTitle.innerHTML = '<i class="fa-solid ' + section.icon + ' mr-2 text-blue-600"></i>' + section.name;
+      homeView.classList.add("hidden");
+      detailView.classList.remove("hidden");
+      hideError();
+      newMemberInput.value = "";
+      newDateInput.value = new Date().toISOString().slice(0, 10);
+      renderTable();
+      renderHistory();
+    }
+
+    function closeSection() {
+      currentSectionId = null;
+      detailView.classList.add("hidden");
+      homeView.classList.remove("hidden");
+      renderHome();
+    }
+
+    function renderTable() {
+      if (!currentSectionId) return;
+      const section = getSectionData(currentSectionId);
+      const hasData = section.members.length > 0 && section.dates.length > 0;
+
+      if (section.members.length === 0 && section.dates.length === 0) {
+        attendanceTable.classList.add("hidden");
+        emptyState.classList.remove("hidden");
+        tableHead.innerHTML = "";
+        tableBody.innerHTML = "";
+        return;
+      }
+
+      attendanceTable.classList.remove("hidden");
+      emptyState.classList.toggle("hidden", hasData);
+
+      let headHtml =
+        '<tr class="bg-gray-100"><th class="sticky left-0 z-20 bg-gray-100 border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 min-w-[120px]">' +
+          '<i class="fa-solid fa-user mr-1"></i>姓名</th>';
+
+      section.dates.forEach(function (date) {
+        headHtml +=
+          '<th class="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 min-w-[90px] relative group">' +
+            '<span class="block text-xs leading-tight"><i class="fa-solid fa-calendar-day mr-0.5 text-gray-400"></i>' + formatDate(date) + "</span>" +
+            '<button type="button" data-remove-date="' + date + '" class="absolute top-0.5 right-0.5 hidden group-hover:inline text-red-400 hover:text-red-600 text-xs" title="刪除此日期">' +
+              '<i class="fa-solid fa-xmark"></i></button></th>';
+      });
+
+      headHtml +=
+        '<th class="border border-gray-300 px-3 py-3 text-center font-semibold text-gray-700 min-w-[80px] bg-blue-50"><i class="fa-solid fa-percent mr-0.5"></i>出席率</th>' +
+        '<th class="border border-gray-300 px-3 py-3 text-center font-semibold text-gray-700 min-w-[60px] bg-blue-50"><i class="fa-solid fa-chart-line mr-0.5"></i>評估</th>' +
+        '<th class="border border-gray-300 px-3 py-3 text-center font-semibold text-gray-700 min-w-[50px] bg-gray-50"><i class="fa-solid fa-gear mr-0.5"></i>操作</th></tr>';
+      tableHead.innerHTML = headHtml;
+
+      if (section.members.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="' + (section.dates.length + 4) + '" class="border border-gray-300 px-4 py-8 text-center text-gray-400"><i class="fa-solid fa-user-plus mr-1"></i>請先新增成員姓名</td></tr>';
+        bindHeaderEvents();
+        return;
+      }
+
+      if (section.dates.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4" class="border border-gray-300 px-4 py-8 text-center text-gray-400"><i class="fa-solid fa-calendar-plus mr-1"></i>請先新增集會日期</td></tr>';
+        bindHeaderEvents();
+        return;
+      }
+
+      let bodyHtml = "";
+      section.members.forEach(function (member) {
+        if (!section.attendance[member]) section.attendance[member] = {};
+        bodyHtml += '<tr class="hover:bg-blue-50/40 transition">';
+        bodyHtml += '<td class="sticky left-0 z-10 bg-white border border-gray-300 px-4 py-2 font-medium text-gray-800 whitespace-nowrap"><i class="fa-solid fa-user text-gray-400 mr-1.5"></i>' + member + "</td>";
+
+        let attendedCount = 0;
+        section.dates.forEach(function (date) {
+          const isPresent = section.attendance[member][date] === true;
+          if (isPresent) attendedCount += 1;
+          bodyHtml +=
+            '<td class="border border-gray-300 p-0 text-center">' +
+              '<button type="button" data-member="' + encodeURIComponent(member) + '" data-date="' + date + '" ' +
+                'class="attendance-cell w-full min-w-[90px] min-h-[40px] px-2 py-2 text-base font-bold transition ' +
+                (isPresent ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-white text-gray-300 hover:bg-gray-100 hover:text-gray-500") + '">' +
+                (isPresent ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-minus"></i>') +
+              "</button></td>";
+        });
+
+        const rate = (attendedCount / section.dates.length) * 100;
+        const level = getAttendanceLevel(rate);
+        bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold text-blue-700 bg-blue-50/50">' + rate.toFixed(1) + "%</td>";
+        bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold bg-blue-50/50 ' + level.className + '">' + level.text + "</td>";
+        bodyHtml += '<td class="border border-gray-300 px-2 py-2 text-center bg-gray-50"><button type="button" data-remove-member="' + encodeURIComponent(member) + '" class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition"><i class="fa-solid fa-trash-can mr-0.5"></i>刪除</button></td></tr>';
+      });
+
+      tableBody.innerHTML = bodyHtml;
+      bindTableEvents();
+      bindHeaderEvents();
+      renderHistory();
+    }
+
+    function bindTableEvents() {
+      document.querySelectorAll(".attendance-cell").forEach(function (cell) {
+        cell.addEventListener("click", async function () {
+          try {
+            const member = decodeURIComponent(cell.dataset.member);
+            const date = cell.dataset.date;
+            const section = getSectionData(currentSectionId);
+            if (!section.attendance[member]) section.attendance[member] = {};
+            section.attendance[member][date] = !section.attendance[member][date];
+            await updateSectionData(currentSectionId, section);
+            renderTable();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-remove-member]").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const member = decodeURIComponent(btn.dataset.removeMember);
+          if (!confirm("確定要刪除「" + member + "」嗎？")) return;
+          try {
+            const section = getSectionData(currentSectionId);
+            section.members = section.members.filter(function (m) { return m !== member; });
+            delete section.attendance[member];
+            await updateSectionData(currentSectionId, section);
+            renderTable();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+    }
+
+    function bindHeaderEvents() {
+      document.querySelectorAll("[data-remove-date]").forEach(function (btn) {
+        btn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          const date = btn.dataset.removeDate;
+          if (!confirm("確定要刪除 " + formatDate(date) + " 這次集會嗎？")) return;
+          try {
+            const section = getSectionData(currentSectionId);
+            section.dates = section.dates.filter(function (d) { return d !== date; });
+            section.members.forEach(function (member) {
+              if (section.attendance[member]) delete section.attendance[member][date];
+            });
+            await updateSectionData(currentSectionId, section);
+            renderTable();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+    }
+
+    async function initApp() {
+      toolbarRepo.textContent = GITHUB_CONFIG.owner + "/" + GITHUB_CONFIG.repo + " (" + GITHUB_CONFIG.branch + ")";
+      try {
+        setSyncStatus("載入中…", "info");
+        await fetchFromGitHub();
+        renderHome();
+        setSyncStatus("已載入 GitHub 資料", "success");
+      } catch (err) {
+        setSyncStatus("載入失敗", "error");
+        renderHome();
+        console.error(err);
+      }
+    }
+
+    refreshBtn.addEventListener("click", async function () {
+      try {
+        hideError();
+        setSyncStatus("重新載入中…", "info");
+        await fetchFromGitHub();
+        if (currentSectionId) renderTable();
+        else renderHome();
+        setSyncStatus("已載入最新資料", "success");
+      } catch (err) {
+        setSyncStatus("載入失敗", "error");
+        if (currentSectionId) showError(err.message);
+      }
+    });
+
+    addMemberBtn.addEventListener("click", async function () {
+      hideError();
+      const name = newMemberInput.value.trim();
+      if (!name) { showError("請輸入姓名。"); return; }
+      const section = getSectionData(currentSectionId);
+      if (section.members.includes(name)) { showError("「" + name + "」已登記。"); return; }
+      try {
+        section.members.push(name);
+        section.attendance[name] = {};
+        await updateSectionData(currentSectionId, section);
+        newMemberInput.value = "";
+        renderTable();
+      } catch (err) { showError(err.message); }
+    });
+
+    newMemberInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") addMemberBtn.click();
+    });
+
+    addDateBtn.addEventListener("click", async function () {
+      hideError();
+      const date = newDateInput.value;
+      if (!date) { showError("請選擇集會日期。"); return; }
+      const section = getSectionData(currentSectionId);
+      if (section.dates.includes(date)) { showError("此日期已存在。"); return; }
+      try {
+        section.dates.push(date);
+        section.dates.sort();
+        section.members.forEach(function (member) {
+          if (!section.attendance[member]) section.attendance[member] = {};
+          if (section.attendance[member][date] === undefined) section.attendance[member][date] = false;
+        });
+        await updateSectionData(currentSectionId, section);
+        renderTable();
+      } catch (err) { showError(err.message); }
+    });
+
+    calcSaveBtn.addEventListener("click", async function () {
+      hideError();
+      calcSuccess.classList.add("hidden");
+      const section = getSectionData(currentSectionId);
+      if (section.members.length === 0) { showError("請先新增成員。"); return; }
+      if (section.dates.length === 0) { showError("請先新增集會日期。"); return; }
+      try {
+        const record = buildCalculationSnapshot(currentSectionId);
+        await pushHistoryRecord(record);
+        calcSuccessText.textContent = "已計算並儲存至 GitHub（共 " + record.results.length + " 筆）";
+        calcSuccess.classList.remove("hidden");
+        renderHistory();
+      } catch (err) { showError(err.message); }
+    });
+
+    backBtn.addEventListener("click", closeSection);
+
+    initApp();
+  </script>
+</body>
+</html>
