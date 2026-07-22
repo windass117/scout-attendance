@@ -17,6 +17,11 @@
       </div>
       <div class="flex items-center gap-2">
         <span id="sync-status" class="text-xs text-gray-500"></span>
+        <button id="token-btn" type="button"
+          class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+          title="設定 GitHub Token 以啟用儲存功能">
+          <i class="fa-solid fa-key mr-1"></i>設定 Token
+        </button>
         <button id="refresh-btn" type="button"
           class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
           <i class="fa-solid fa-arrows-rotate mr-1"></i>重新載入
@@ -140,8 +145,9 @@
       repo: "scout-attendance",
       branch: "main",
       path: "data/attendance.json",
-      token: "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", // 填入 repo 權限 Token 後，所有人可直接讀寫 GitHub 資料
     };
+
+    const TOKEN_STORAGE_KEY = "scout-github-token";
 
     const SECTIONS = [
       { id: "grasshopper", name: "小童軍", icon: "fa-seedling", color: "bg-green-500" },
@@ -158,6 +164,7 @@
 
     const toolbarRepo = document.getElementById("toolbar-repo");
     const syncStatus = document.getElementById("sync-status");
+    const tokenBtn = document.getElementById("token-btn");
     const refreshBtn = document.getElementById("refresh-btn");
     const homeView = document.getElementById("home-view");
     const detailView = document.getElementById("detail-view");
@@ -180,12 +187,17 @@
     const historyEmpty = document.getElementById("history-empty");
     const historyList = document.getElementById("history-list");
 
+    function getActiveToken() {
+      return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+    }
+
     function githubHeaders() {
       const headers = {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       };
-      if (GITHUB_CONFIG.token) headers.Authorization = "Bearer " + GITHUB_CONFIG.token;
+      const token = getActiveToken();
+      if (token) headers.Authorization = "Bearer " + token;
       return headers;
     }
 
@@ -237,49 +249,36 @@
     }
 
     async function fetchFromGitHub() {
-      if (GITHUB_CONFIG.token) {
-        const url = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
-        const res = await fetch(url, { headers: githubHeaders() });
-        if (res.status === 404) {
-          cache = { attendance: {}, history: [] };
-          githubSha = null;
-          return cache;
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(function () { return {}; });
-          throw new Error(err.message || "無法讀取 GitHub 資料（" + res.status + "）");
-        }
-        const file = await res.json();
-        githubSha = file.sha;
-        return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
-      }
-
       const localPath = GITHUB_CONFIG.path.startsWith("/") ? GITHUB_CONFIG.path.slice(1) : GITHUB_CONFIG.path;
-      let res = await fetch("./" + localPath);
-      if (!res.ok) res = await fetch(getRawUrl());
+      let res = await fetch("./" + localPath + "?t=" + Date.now());
+      if (!res.ok) res = await fetch(getRawUrl() + "?t=" + Date.now());
       if (res.status === 404) {
         cache = { attendance: {}, history: [] };
         githubSha = null;
         return cache;
       }
       if (!res.ok) throw new Error("無法讀取 GitHub 資料（" + res.status + "）");
-      return applyParsedData(await res.json());
+      applyParsedData(await res.json());
+      await refreshSha();
+      return cache;
     }
 
     async function refreshSha() {
-      if (!GITHUB_CONFIG.token) return;
+      if (!getActiveToken()) return;
       const url = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
       const res = await fetch(url, { headers: githubHeaders() });
       if (res.ok) {
         const file = await res.json();
         githubSha = file.sha;
+      } else {
+        githubSha = null;
       }
     }
 
     async function saveToGitHub(message) {
       if (isSyncing) return;
-      if (!GITHUB_CONFIG.token) {
-        throw new Error("尚未設定 GitHub Token，無法儲存。請由管理員在程式碼中設定 GITHUB_CONFIG.token");
+      if (!getActiveToken()) {
+        throw new Error("尚未設定 GitHub Token，無法儲存。請按頂部「設定 Token」");
       }
       if (!githubSha) await refreshSha();
 
@@ -309,6 +308,9 @@
 
         if (!res.ok) {
           const err = await res.json().catch(function () { return {}; });
+          if (res.status === 401) {
+            throw new Error("GitHub Token 已失效，請重新按「設定 Token」輸入");
+          }
           throw new Error(err.message || "無法寫入 GitHub（" + res.status + "）");
         }
 
@@ -625,6 +627,24 @@
         console.error(err);
       }
     }
+
+    tokenBtn.addEventListener("click", function () {
+      const current = getActiveToken();
+      const input = prompt(
+        "請輸入 GitHub Personal Access Token（需 repo 權限）\n留空並確定可清除已儲存的 Token",
+        current ? "（已設定，輸入新 Token 覆蓋）" : ""
+      );
+      if (input === null) return;
+      const token = input.trim();
+      if (token === "" || token === "（已設定，輸入新 Token 覆蓋）") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        setSyncStatus("已清除 Token", "info");
+        return;
+      }
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      setSyncStatus("Token 已儲存", "success");
+      refreshSha();
+    });
 
     refreshBtn.addEventListener("click", async function () {
       try {
