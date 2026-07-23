@@ -31,6 +31,13 @@
           "2026-06-27": true
         }
       }
+    },
+    "cub": {
+      "members": [],
+      "dates": [
+        "2026-01-03"
+      ],
+      "attendance": {}
     }
   },
   "history": [
