@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>童軍集會點名</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body class="min-h-screen bg-gray-100">
@@ -21,6 +22,10 @@
           class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
           title="設定 GitHub Token 以啟用儲存功能">
           <i class="fa-solid fa-key mr-1"></i>設定 Token
+        </button>
+        <button id="export-btn" type="button"
+          class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
+          <i class="fa-solid fa-file-excel mr-1 text-green-600"></i>匯出 Excel
         </button>
         <button id="refresh-btn" type="button"
           class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
@@ -166,6 +171,7 @@
     const toolbarRepo = document.getElementById("toolbar-repo");
     const syncStatus = document.getElementById("sync-status");
     const tokenBtn = document.getElementById("token-btn");
+    const exportBtn = document.getElementById("export-btn");
     const refreshBtn = document.getElementById("refresh-btn");
     const homeView = document.getElementById("home-view");
     const detailView = document.getElementById("detail-view");
@@ -633,6 +639,65 @@
       });
     }
 
+    function exportAllToExcel() {
+      if (typeof XLSX === "undefined") {
+        alert("Excel 匯出套件載入失敗，請重新整理頁面後再試。");
+        return;
+      }
+
+      const data = loadData();
+      const wb = XLSX.utils.book_new();
+      let hasSheet = false;
+
+      SECTIONS.forEach(function (sectionMeta) {
+        const section = data[sectionMeta.id] || { members: [], dates: [], attendance: {} };
+        if (section.members.length === 0 && section.dates.length === 0) return;
+
+        const header = ["姓名"].concat(section.dates.map(formatDate)).concat(["出席率", "評估"]);
+        const rows = [header];
+
+        section.members.forEach(function (member) {
+          const row = [member];
+          let attended = 0;
+          section.dates.forEach(function (date) {
+            const present = section.attendance[member] && section.attendance[member][date] === true;
+            if (present) attended += 1;
+            row.push(present ? "✓" : "—");
+          });
+          const rate = section.dates.length > 0 ? (attended / section.dates.length) * 100 : 0;
+          const level = getAttendanceLevel(rate);
+          row.push(rate.toFixed(1) + "%", level.text);
+          rows.push(row);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, sectionMeta.name.slice(0, 31));
+        hasSheet = true;
+      });
+
+      const history = loadHistory();
+      if (history.length > 0) {
+        const histRows = [["時間", "支部", "姓名", "出席次數", "總集會次數", "出席率", "評估"]];
+        history.forEach(function (item) {
+          const timeStr = new Date(item.calculatedAt).toLocaleString("zh-Hant");
+          (item.results || []).forEach(function (r) {
+            histRows.push([timeStr, item.sectionName, r.name, r.attended, r.total, r.rate + "%", r.level]);
+          });
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(histRows), "計算紀錄");
+        hasSheet = true;
+      }
+
+      if (!hasSheet) {
+        alert("目前沒有任何紀錄可匯出。");
+        return;
+      }
+
+      const filename = "童軍集會點名_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+      XLSX.writeFile(wb, filename);
+      setSyncStatus("已匯出 Excel", "success");
+    }
+
     async function initApp() {
       toolbarRepo.textContent = GITHUB_CONFIG.owner + "/" + GITHUB_CONFIG.repo + " (" + GITHUB_CONFIG.branch + ")";
       try {
@@ -669,6 +734,8 @@
       setSyncStatus("Token 已儲存", "success");
       refreshSha();
     });
+
+    exportBtn.addEventListener("click", exportAllToExcel);
 
     refreshBtn.addEventListener("click", async function () {
       try {
