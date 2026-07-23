@@ -4,9 +4,13 @@
       "members": [
         "hello"
       ],
-      "dates": [],
+      "dates": [
+        "2026-07-11"
+      ],
       "attendance": {
-        "hello": {}
+        "hello": {
+          "2026-07-11": false
+        }
       }
     }
   },
