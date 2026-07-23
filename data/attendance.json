@@ -3,7 +3,8 @@
     "rover": {
       "members": [
         "hello",
-        "ryan"
+        "ryan",
+        "peter"
       ],
       "dates": [
         "2026-06-27",
@@ -19,7 +20,8 @@
         "ryan": {
           "2026-06-27": true,
           "2026-07-11": false
-        }
+        },
+        "peter": {}
       }
     }
   },
