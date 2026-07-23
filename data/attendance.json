@@ -2,7 +2,6 @@
   "attendance": {
     "rover": {
       "members": [
-        "ryan",
         "sheila",
         "John"
       ],
@@ -12,11 +11,6 @@
         "2026-07-11"
       ],
       "attendance": {
-        "ryan": {
-          "2026-07-11": true,
-          "2026-06-27": true,
-          "2026-07-04": "absent"
-        },
         "sheila": {
           "2026-06-27": true,
           "2026-07-04": true,
