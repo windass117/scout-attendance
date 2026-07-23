@@ -472,7 +472,7 @@
           "2026-01-17": "na",
           "2026-01-24": "na",
           "2026-02-07": "na",
-          "2026-03-07": "present"
+          "2026-03-07": "na"
         },
         "高灝舜": {
           "2026-07-04": "present",
@@ -1868,6 +1868,168 @@
           "total": 7,
           "rate": 28.6,
           "level": "低"
+        }
+      ]
+    },
+    {
+      "id": 1784799088172,
+      "calculatedAt": "2026-07-23T09:31:28.172Z",
+      "sectionId": "cub",
+      "sectionName": "幼童軍",
+      "results": [
+        {
+          "name": "林彥回",
+          "attended": 12,
+          "total": 18,
+          "rate": 66.7,
+          "level": "中"
+        },
+        {
+          "name": "朱樂賢",
+          "attended": 12,
+          "total": 18,
+          "rate": 66.7,
+          "level": "中"
+        },
+        {
+          "name": "蔡皓然",
+          "attended": 13,
+          "total": 18,
+          "rate": 72.2,
+          "level": "中"
+        },
+        {
+          "name": "蘇栢賢",
+          "attended": 14,
+          "total": 18,
+          "rate": 77.8,
+          "level": "中"
+        },
+        {
+          "name": "蘇栢朗",
+          "attended": 14,
+          "total": 18,
+          "rate": 77.8,
+          "level": "中"
+        },
+        {
+          "name": "陳柏雋",
+          "attended": 15,
+          "total": 18,
+          "rate": 83.3,
+          "level": "高"
+        },
+        {
+          "name": "何奕朗",
+          "attended": 15,
+          "total": 18,
+          "rate": 83.3,
+          "level": "高"
+        },
+        {
+          "name": "何奕晞",
+          "attended": 17,
+          "total": 18,
+          "rate": 94.4,
+          "level": "高"
+        },
+        {
+          "name": "楊然迪",
+          "attended": 12,
+          "total": 18,
+          "rate": 66.7,
+          "level": "中"
+        },
+        {
+          "name": "連珈穎",
+          "attended": 10,
+          "total": 18,
+          "rate": 55.6,
+          "level": "中"
+        },
+        {
+          "name": "連珈寶",
+          "attended": 10,
+          "total": 18,
+          "rate": 55.6,
+          "level": "中"
+        },
+        {
+          "name": "鍾卓一",
+          "attended": 8,
+          "total": 18,
+          "rate": 44.4,
+          "level": "低"
+        },
+        {
+          "name": "黃正陽",
+          "attended": 14,
+          "total": 18,
+          "rate": 77.8,
+          "level": "中"
+        },
+        {
+          "name": "黃日齊",
+          "attended": 13,
+          "total": 18,
+          "rate": 72.2,
+          "level": "中"
+        },
+        {
+          "name": "鄺子臻",
+          "attended": 15,
+          "total": 18,
+          "rate": 83.3,
+          "level": "高"
+        },
+        {
+          "name": "莊海琳",
+          "attended": 13,
+          "total": 18,
+          "rate": 72.2,
+          "level": "中"
+        },
+        {
+          "name": "吳梓謙",
+          "attended": 0,
+          "total": 18,
+          "rate": 0,
+          "level": "低"
+        },
+        {
+          "name": "袁一藍",
+          "attended": 2,
+          "total": 16,
+          "rate": 12.5,
+          "level": "低"
+        },
+        {
+          "name": "陳彥希",
+          "attended": 3,
+          "total": 3,
+          "rate": 100,
+          "level": "高"
+        },
+        {
+          "name": "黃昱然",
+          "attended": 3,
+          "total": 3,
+          "rate": 100,
+          "level": "高"
+        },
+        {
+          "name": "高灝舜",
+          "attended": 1,
+          "total": 3,
+          "rate": 33.3,
+          "level": "低"
+        },
+        {
+          "name": "葉楚航",
+          "attended": 2,
+          "total": 2,
+          "rate": 100,
+          "level": "高"
         }
       ]
     }
