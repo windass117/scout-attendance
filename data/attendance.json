@@ -22,7 +22,9 @@
           "2026-06-27": false
         },
         "sheila": {
-          "2026-06-27": true
+          "2026-06-27": true,
+          "2026-07-04": true,
+          "2026-07-11": true
         }
       }
     }
@@ -62,6 +64,35 @@
           "total": 2,
           "rate": 50,
           "level": "中"
+        }
+      ]
+    },
+    {
+      "id": 1784794019342,
+      "calculatedAt": "2026-07-23T08:06:59.342Z",
+      "sectionId": "rover",
+      "sectionName": "樂行童軍",
+      "results": [
+        {
+          "name": "hello",
+          "attended": 1,
+          "total": 3,
+          "rate": 33.3,
+          "level": "低"
+        },
+        {
+          "name": "ryan",
+          "attended": 1,
+          "total": 3,
+          "rate": 33.3,
+          "level": "低"
+        },
+        {
+          "name": "sheila",
+          "attended": 3,
+          "total": 3,
+          "rate": 100,
+          "level": "高"
         }
       ]
     }
