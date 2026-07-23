@@ -1,4 +1,14 @@
 {
-  "attendance": {},
+  "attendance": {
+    "rover": {
+      "members": [
+        "hello"
+      ],
+      "dates": [],
+      "attendance": {
+        "hello": {}
+      }
+    }
+  },
   "history": []
 }
