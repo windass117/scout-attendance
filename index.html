@@ -189,7 +189,21 @@
     const historyList = document.getElementById("history-list");
 
     function getActiveToken() {
-      return localStorage.getItem(TOKEN_STORAGE_KEY) || GITHUB_CONFIG.defaultToken || "";
+      if (GITHUB_CONFIG.defaultToken) return GITHUB_CONFIG.defaultToken;
+      return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+    }
+
+    async function validateAndClearBadToken() {
+      const lsToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!lsToken || GITHUB_CONFIG.defaultToken) {
+        if (GITHUB_CONFIG.defaultToken) localStorage.removeItem(TOKEN_STORAGE_KEY);
+        return;
+      }
+      const res = await fetch(
+        getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch),
+        { headers: githubHeaders() }
+      );
+      if (res.status === 401) localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
 
     function githubHeaders() {
@@ -310,6 +324,10 @@
         if (!res.ok) {
           const err = await res.json().catch(function () { return {}; });
           if (res.status === 401) {
+            localStorage.removeItem(TOKEN_STORAGE_KEY);
+            if (GITHUB_CONFIG.defaultToken) {
+              throw new Error("GitHub Token 已失效，請聯絡管理員更新部署設定");
+            }
             throw new Error("GitHub Token 已失效，請重新按「設定 Token」輸入");
           }
           throw new Error(err.message || "無法寫入 GitHub（" + res.status + "）");
@@ -619,6 +637,7 @@
       toolbarRepo.textContent = GITHUB_CONFIG.owner + "/" + GITHUB_CONFIG.repo + " (" + GITHUB_CONFIG.branch + ")";
       try {
         setSyncStatus("載入中…", "info");
+        await validateAndClearBadToken();
         await fetchFromGitHub();
         renderHome();
         setSyncStatus("已載入 GitHub 資料", "success");
@@ -630,6 +649,10 @@
     }
 
     tokenBtn.addEventListener("click", function () {
+      if (GITHUB_CONFIG.defaultToken) {
+        alert("此網站已由管理員設定 Token，無需手動輸入。\n若仍有問題，請清除瀏覽器快取後重新整理（Ctrl+Shift+R）。");
+        return;
+      }
       const current = getActiveToken();
       const input = prompt(
         "請輸入 GitHub Personal Access Token（需 repo 權限）\n留空並確定可清除已儲存的 Token",
