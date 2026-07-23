@@ -127,7 +127,7 @@
         </div>
 
         <p class="mt-3 text-xs text-gray-500">
-          <i class="fa-solid fa-circle-info mr-1"></i>提示：資料自動從 GitHub 載入，所有人看到相同內容。點擊格子切換出席／缺席，按「重新載入」取得最新更新。
+          <i class="fa-solid fa-circle-info mr-1"></i>提示：資料儲存於 GitHub，其他電腦請按「重新載入」取得最新資料。點擊格子切換出席／缺席。
         </p>
 
         <section class="mt-8 border-t border-gray-200 pt-6">
@@ -270,9 +270,7 @@
     }
 
     async function fetchFromGitHub() {
-      const localPath = GITHUB_CONFIG.path.startsWith("/") ? GITHUB_CONFIG.path.slice(1) : GITHUB_CONFIG.path;
-      let res = await fetch("./" + localPath + "?t=" + Date.now());
-      if (!res.ok) res = await fetch(getRawUrl() + "?t=" + Date.now());
+      const res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
       if (res.status === 404) {
         cache = { attendance: {}, history: [] };
         githubSha = null;
