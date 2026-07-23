@@ -2,7 +2,8 @@
   "attendance": {
     "rover": {
       "members": [
-        "hello"
+        "hello",
+        "ryan"
       ],
       "dates": [
         "2026-07-04",
@@ -12,7 +13,8 @@
         "hello": {
           "2026-07-11": false,
           "2026-07-04": true
-        }
+        },
+        "ryan": {}
       }
     }
   },
