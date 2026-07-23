@@ -145,6 +145,7 @@
       repo: "scout-attendance",
       branch: "main",
       path: "data/attendance.json",
+      defaultToken: "",
     };
 
     const TOKEN_STORAGE_KEY = "scout-github-token";
@@ -188,7 +189,7 @@
     const historyList = document.getElementById("history-list");
 
     function getActiveToken() {
-      return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+      return localStorage.getItem(TOKEN_STORAGE_KEY) || GITHUB_CONFIG.defaultToken || "";
     }
 
     function githubHeaders() {
