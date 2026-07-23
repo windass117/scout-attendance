@@ -200,11 +200,12 @@
     }
 
     async function validateAndClearBadToken() {
-      const lsToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-      if (!lsToken || GITHUB_CONFIG.defaultToken) {
-        if (GITHUB_CONFIG.defaultToken) localStorage.removeItem(TOKEN_STORAGE_KEY);
+      if (GITHUB_CONFIG.defaultToken) {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
         return;
       }
+      const lsToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (!lsToken) return;
       const res = await fetch(
         getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch),
         { headers: githubHeaders() }
