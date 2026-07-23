@@ -213,11 +213,15 @@
       if (res.status === 401) localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
 
-    function githubHeaders() {
-      const headers = {
+    function publicGithubHeaders() {
+      return {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       };
+    }
+
+    function githubHeaders() {
+      const headers = publicGithubHeaders();
       const token = getActiveToken();
       if (token) headers.Authorization = "Bearer " + token;
       return headers;
@@ -237,6 +241,11 @@
     function setSyncStatus(text, type) {
       syncStatus.textContent = text;
       syncStatus.className = "text-xs " + (type === "error" ? "text-red-600" : type === "success" ? "text-green-600" : "text-gray-500");
+    }
+
+    function syncStatusSummary() {
+      const n = loadHistory().length;
+      return n > 0 ? "（歷史紀錄 " + n + " 筆）" : "";
     }
 
     function showError(message) {
@@ -271,7 +280,22 @@
     }
 
     async function fetchFromGitHub() {
-      const res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
+      const apiUrl = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
+      let res = await fetch(apiUrl, { headers: publicGithubHeaders(), cache: "no-store" });
+
+      if (res.ok) {
+        const file = await res.json();
+        githubSha = file.sha;
+        return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
+      }
+
+      if (res.status === 404) {
+        cache = { attendance: {}, history: [] };
+        githubSha = null;
+        return cache;
+      }
+
+      res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
       if (res.status === 404) {
         cache = { attendance: {}, history: [] };
         githubSha = null;
@@ -281,6 +305,20 @@
       applyParsedData(await res.json());
       await refreshSha();
       return cache;
+    }
+
+    async function testToken(token) {
+      const res = await fetch(
+        getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch),
+        {
+          headers: {
+            Authorization: "Bearer " + token,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        }
+      );
+      return res.status === 200;
     }
 
     async function refreshSha() {
@@ -704,7 +742,7 @@
         await validateAndClearBadToken();
         await fetchFromGitHub();
         renderHome();
-        setSyncStatus("已載入 GitHub 資料", "success");
+        setSyncStatus("已載入 GitHub 資料" + syncStatusSummary(), "success");
       } catch (err) {
         setSyncStatus("載入失敗", "error");
         renderHome();
@@ -712,26 +750,36 @@
       }
     }
 
-    tokenBtn.addEventListener("click", function () {
+    tokenBtn.addEventListener("click", async function () {
       if (GITHUB_CONFIG.defaultToken) {
         alert("此網站已由管理員設定 Token，無需手動輸入。\n若仍有問題，請清除瀏覽器快取後重新整理（Ctrl+Shift+R）。");
         return;
       }
-      const current = getActiveToken();
       const input = prompt(
-        "請輸入 GitHub Personal Access Token（需 repo 權限）\n留空並確定可清除已儲存的 Token",
-        current ? "（已設定，輸入新 Token 覆蓋）" : ""
+        "請輸入 GitHub Personal Access Token\n" +
+        "建立方式：GitHub → Settings → Developer settings → Tokens (classic) → 勾選 repo\n" +
+        "留空並確定可清除已儲存的 Token"
       );
       if (input === null) return;
       const token = input.trim();
-      if (token === "" || token === "（已設定，輸入新 Token 覆蓋）") {
+      if (token === "") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         setSyncStatus("已清除 Token", "info");
         return;
       }
+
+      setSyncStatus("驗證 Token 中…", "info");
+      const valid = await testToken(token);
+      if (!valid) {
+        setSyncStatus("Token 無效", "error");
+        alert("GitHub Token 無效或已過期。\n請確認 Token 有 repo 權限，並重新建立後再試。");
+        return;
+      }
+
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      setSyncStatus("Token 已儲存", "success");
-      refreshSha();
+      githubSha = null;
+      await refreshSha();
+      setSyncStatus("Token 已驗證並儲存", "success");
     });
 
     exportBtn.addEventListener("click", exportAllToExcel);
@@ -743,7 +791,7 @@
         await fetchFromGitHub();
         if (currentSectionId) renderTable();
         else renderHome();
-        setSyncStatus("已載入最新資料", "success");
+        setSyncStatus("已載入最新資料" + syncStatusSummary(), "success");
       } catch (err) {
         setSyncStatus("載入失敗", "error");
         if (currentSectionId) showError(err.message);
