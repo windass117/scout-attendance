@@ -1,19 +1,13 @@
 {
   "attendance": {
     "rover": {
-      "members": [
-        "John"
-      ],
+      "members": [],
       "dates": [
         "2026-06-27",
         "2026-07-04",
         "2026-07-11"
       ],
-      "attendance": {
-        "John": {
-          "2026-06-27": true
-        }
-      }
+      "attendance": {}
     },
     "cub": {
       "members": [
