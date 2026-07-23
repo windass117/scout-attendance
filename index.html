@@ -433,6 +433,10 @@
       return month + "/" + day + " (" + weekdays[d.getDay()] + ")";
     }
 
+    function getDisplayDates(dates) {
+      return dates.slice().sort(function (a, b) { return b.localeCompare(a); });
+    }
+
     const ATTENDANCE = { PRESENT: "present", ABSENT: "absent", NA: "na" };
 
     function normalizeStatus(value) {
@@ -595,7 +599,9 @@
         '<tr class="bg-gray-100"><th class="sticky left-0 z-20 bg-gray-100 border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 min-w-[120px]">' +
           '<i class="fa-solid fa-user mr-1"></i>姓名</th>';
 
-      section.dates.forEach(function (date) {
+      const displayDates = getDisplayDates(section.dates);
+
+      displayDates.forEach(function (date) {
         headHtml +=
           '<th class="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-700 min-w-[90px] relative group">' +
             '<span class="block text-xs leading-tight"><i class="fa-solid fa-calendar-day mr-0.5 text-gray-400"></i>' + formatDate(date) + "</span>" +
@@ -627,7 +633,7 @@
         bodyHtml += '<tr class="hover:bg-blue-50/40 transition">';
         bodyHtml += '<td class="sticky left-0 z-10 bg-white border border-gray-300 px-4 py-2 font-medium text-gray-800 whitespace-nowrap"><i class="fa-solid fa-user text-gray-400 mr-1.5"></i>' + member + "</td>";
 
-        section.dates.forEach(function (date) {
+        displayDates.forEach(function (date) {
           const raw = section.attendance[member][date];
           const display = getStatusDisplay(raw);
           bodyHtml +=
@@ -723,12 +729,12 @@
         const section = data[sectionMeta.id] || { members: [], dates: [], attendance: {} };
         if (section.members.length === 0 && section.dates.length === 0) return;
 
-        const header = ["姓名"].concat(section.dates.map(formatDate)).concat(["出席率", "評估"]);
+        const header = ["姓名"].concat(getDisplayDates(section.dates).map(formatDate)).concat(["出席率", "評估"]);
         const rows = [header];
 
         section.members.forEach(function (member) {
           const row = [member];
-          section.dates.forEach(function (date) {
+          getDisplayDates(section.dates).forEach(function (date) {
             const raw = section.attendance[member] && section.attendance[member][date];
             row.push(statusLabelForExport(raw));
           });
@@ -855,7 +861,7 @@
       if (section.dates.includes(date)) { showError("此日期已存在。"); return; }
       try {
         section.dates.push(date);
-        section.dates.sort();
+        section.dates.sort(function (a, b) { return b.localeCompare(a); });
         section.members.forEach(function (member) {
           if (!section.attendance[member]) section.attendance[member] = {};
           if (section.attendance[member][date] === undefined) section.attendance[member][date] = ATTENDANCE.ABSENT;
