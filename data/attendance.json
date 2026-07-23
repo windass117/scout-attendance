@@ -155,6 +155,42 @@
           "level": "高"
         }
       ]
+    },
+    {
+      "id": 1784795740323,
+      "calculatedAt": "2026-07-23T08:35:40.323Z",
+      "sectionId": "rover",
+      "sectionName": "樂行童軍",
+      "results": [
+        {
+          "name": "hello",
+          "attended": 1,
+          "total": 3,
+          "rate": 33.3,
+          "level": "低"
+        },
+        {
+          "name": "ryan",
+          "attended": 2,
+          "total": 3,
+          "rate": 66.7,
+          "level": "中"
+        },
+        {
+          "name": "sheila",
+          "attended": 3,
+          "total": 3,
+          "rate": 100,
+          "level": "高"
+        },
+        {
+          "name": "John",
+          "attended": 0,
+          "total": 3,
+          "rate": 0,
+          "level": "低"
+        }
+      ]
     }
   ]
 }
