@@ -6,16 +6,18 @@
         "ryan"
       ],
       "dates": [
+        "2026-06-27",
         "2026-07-04",
         "2026-07-11"
       ],
       "attendance": {
         "hello": {
           "2026-07-11": false,
-          "2026-07-04": true
+          "2026-07-04": true,
+          "2026-06-27": false
         },
         "ryan": {
-          "2026-07-11": true
+          "2026-06-27": false
         }
       }
     }
@@ -29,28 +31,6 @@
       "results": [
         {
           "name": "hello",
-          "attended": 1,
-          "total": 2,
-          "rate": 50,
-          "level": "中"
-        }
-      ]
-    },
-    {
-      "id": 1784792995724,
-      "calculatedAt": "2026-07-23T07:49:55.724Z",
-      "sectionId": "rover",
-      "sectionName": "樂行童軍",
-      "results": [
-        {
-          "name": "hello",
-          "attended": 1,
-          "total": 2,
-          "rate": 50,
-          "level": "中"
-        },
-        {
-          "name": "ryan",
           "attended": 1,
           "total": 2,
           "rate": 50,
