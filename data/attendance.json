@@ -33,11 +33,15 @@
       }
     },
     "cub": {
-      "members": [],
+      "members": [
+        "林彥回"
+      ],
       "dates": [
         "2026-01-03"
       ],
-      "attendance": {}
+      "attendance": {
+        "林彥回": {}
+      }
     }
   },
   "history": [
