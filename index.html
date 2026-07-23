@@ -127,7 +127,7 @@
         </div>
 
         <p class="mt-3 text-xs text-gray-500">
-          <i class="fa-solid fa-circle-info mr-1"></i>提示：資料儲存於 GitHub，其他電腦請按「重新載入」取得最新資料。點擊格子切換出席／缺席。
+          <i class="fa-solid fa-circle-info mr-1"></i>提示：資料儲存於 GitHub，其他電腦請按「重新載入」取得最新資料。點擊格子依序切換：缺席 → 出席 → 未加入。
         </p>
 
         <section class="mt-8 border-t border-gray-200 pt-6">
@@ -433,6 +433,36 @@
       return month + "/" + day + " (" + weekdays[d.getDay()] + ")";
     }
 
+    const ATTENDANCE = { PRESENT: "present", ABSENT: "absent", NA: "na" };
+
+    function normalizeStatus(value) {
+      if (value === true || value === "present") return ATTENDANCE.PRESENT;
+      if (value === "na" || value === "not_joined") return ATTENDANCE.NA;
+      return ATTENDANCE.ABSENT;
+    }
+
+    function nextStatus(value) {
+      const status = normalizeStatus(value);
+      if (status === ATTENDANCE.ABSENT) return ATTENDANCE.PRESENT;
+      if (status === ATTENDANCE.PRESENT) return ATTENDANCE.NA;
+      return ATTENDANCE.ABSENT;
+    }
+
+    function getStatusDisplay(value) {
+      const status = normalizeStatus(value);
+      if (status === ATTENDANCE.PRESENT) {
+        return { text: "出席", icon: "fa-check", classes: "bg-green-100 text-green-700 hover:bg-green-200" };
+      }
+      if (status === ATTENDANCE.NA) {
+        return { text: "未加入", icon: "fa-ban", classes: "bg-gray-100 text-gray-500 hover:bg-gray-200" };
+      }
+      return { text: "缺席", icon: "fa-xmark", classes: "bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600" };
+    }
+
+    function statusLabelForExport(value) {
+      return getStatusDisplay(value).text;
+    }
+
     function getAttendanceLevel(rate) {
       if (rate >= 80) return { text: "高", className: "text-green-600" };
       if (rate >= 50) return { text: "中", className: "text-yellow-600" };
@@ -440,13 +470,15 @@
     }
 
     function calcMemberRate(section, member) {
-      const total = section.dates.length;
-      if (total === 0) return { attended: 0, total: 0, rate: 0, level: getAttendanceLevel(0) };
       let attended = 0;
+      let total = 0;
       section.dates.forEach(function (date) {
-        if (section.attendance[member] && section.attendance[member][date] === true) attended += 1;
+        const status = normalizeStatus(section.attendance[member] && section.attendance[member][date]);
+        if (status === ATTENDANCE.NA) return;
+        total += 1;
+        if (status === ATTENDANCE.PRESENT) attended += 1;
       });
-      const rate = (attended / total) * 100;
+      const rate = total === 0 ? 0 : (attended / total) * 100;
       return { attended, total, rate, level: getAttendanceLevel(rate) };
     }
 
@@ -595,21 +627,21 @@
         bodyHtml += '<tr class="hover:bg-blue-50/40 transition">';
         bodyHtml += '<td class="sticky left-0 z-10 bg-white border border-gray-300 px-4 py-2 font-medium text-gray-800 whitespace-nowrap"><i class="fa-solid fa-user text-gray-400 mr-1.5"></i>' + member + "</td>";
 
-        let attendedCount = 0;
         section.dates.forEach(function (date) {
-          const isPresent = section.attendance[member][date] === true;
-          if (isPresent) attendedCount += 1;
+          const raw = section.attendance[member][date];
+          const display = getStatusDisplay(raw);
           bodyHtml +=
             '<td class="border border-gray-300 p-0 text-center">' +
               '<button type="button" data-member="' + encodeURIComponent(member) + '" data-date="' + date + '" ' +
-                'class="attendance-cell w-full min-w-[90px] min-h-[40px] px-2 py-2 text-base font-bold transition ' +
-                (isPresent ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-white text-gray-300 hover:bg-gray-100 hover:text-gray-500") + '">' +
-                (isPresent ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-minus"></i>') +
+                'class="attendance-cell w-full min-w-[90px] min-h-[40px] px-2 py-2 text-sm font-bold transition ' + display.classes + '" ' +
+                'title="' + display.text + '">' +
+                '<i class="fa-solid ' + display.icon + ' mr-0.5"></i>' + display.text +
               "</button></td>";
         });
 
-        const rate = (attendedCount / section.dates.length) * 100;
-        const level = getAttendanceLevel(rate);
+        const stats = calcMemberRate(section, member);
+        const rate = stats.rate;
+        const level = stats.level;
         bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold text-blue-700 bg-blue-50/50">' + rate.toFixed(1) + "%</td>";
         bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold bg-blue-50/50 ' + level.className + '">' + level.text + "</td>";
         bodyHtml += '<td class="border border-gray-300 px-2 py-2 text-center bg-gray-50"><button type="button" data-remove-member="' + encodeURIComponent(member) + '" class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition"><i class="fa-solid fa-trash-can mr-0.5"></i>刪除</button></td></tr>';
@@ -629,7 +661,8 @@
             const date = cell.dataset.date;
             const section = getSectionData(currentSectionId);
             if (!section.attendance[member]) section.attendance[member] = {};
-            section.attendance[member][date] = !section.attendance[member][date];
+            const current = section.attendance[member][date];
+            section.attendance[member][date] = nextStatus(current);
             await updateSectionData(currentSectionId, section);
             renderTable();
           } catch (err) {
@@ -695,15 +728,12 @@
 
         section.members.forEach(function (member) {
           const row = [member];
-          let attended = 0;
           section.dates.forEach(function (date) {
-            const present = section.attendance[member] && section.attendance[member][date] === true;
-            if (present) attended += 1;
-            row.push(present ? "✓" : "—");
+            const raw = section.attendance[member] && section.attendance[member][date];
+            row.push(statusLabelForExport(raw));
           });
-          const rate = section.dates.length > 0 ? (attended / section.dates.length) * 100 : 0;
-          const level = getAttendanceLevel(rate);
-          row.push(rate.toFixed(1) + "%", level.text);
+          const stats = calcMemberRate(section, member);
+          row.push(stats.rate.toFixed(1) + "%", stats.level.text);
           rows.push(row);
         });
 
@@ -828,7 +858,7 @@
         section.dates.sort();
         section.members.forEach(function (member) {
           if (!section.attendance[member]) section.attendance[member] = {};
-          if (section.attendance[member][date] === undefined) section.attendance[member][date] = false;
+          if (section.attendance[member][date] === undefined) section.attendance[member][date] = ATTENDANCE.ABSENT;
         });
         await updateSectionData(currentSectionId, section);
         renderTable();
