@@ -1579,7 +1579,11 @@
       const header = ["姓名"].concat(exportDates.map(formatDate)).concat(["出席率", "評估"]);
       const rows = [[periodLabel], header];
 
-      section.members.forEach(function (member) {
+      const sortedMembers = section.members.slice().sort(function (a, b) {
+        return calcMemberRate(section, b, exportDates).rate - calcMemberRate(section, a, exportDates).rate;
+      });
+
+      sortedMembers.forEach(function (member) {
         const row = [member];
         exportDates.forEach(function (date) {
           const raw = section.attendance[member] && section.attendance[member][date];
