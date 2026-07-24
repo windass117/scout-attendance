@@ -42,7 +42,7 @@
           <i class="fa-solid fa-hand-pointer mr-1"></i>請選擇功能或支部
         </p>
       </header>
-      <div id="section-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"></div>
+      <div id="section-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5"></div>
       <div id="home-extra-grid" class="mt-4 sm:mt-5"></div>
     </main>
   </div>
@@ -1336,8 +1336,23 @@
         sectionGrid.appendChild(card);
       });
 
+      const linksCount = loadUsefulLinks().length;
+      const linksCard = document.createElement("button");
+      linksCard.type = "button";
+      linksCard.className = "text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-indigo-300 hover:shadow-xl transition group";
+      linksCard.innerHTML =
+        '<div class="flex items-center gap-3 mb-3">' +
+          '<span class="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-500 text-white">' +
+            '<i class="fa-solid fa-link"></i></span>' +
+          '<h3 class="text-lg sm:text-xl font-bold text-gray-800">有用連結</h3></div>' +
+        '<p class="text-sm text-gray-500"><i class="fa-solid fa-bookmark mr-1 text-gray-400"></i>常用網頁連結</p>' +
+        '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-list mr-1 text-gray-400"></i>連結：<span class="font-semibold text-gray-700">' + linksCount + "</span> 個</p>" +
+        '<p class="mt-4 text-sm font-medium text-indigo-600 group-hover:text-indigo-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入連結頁</p>';
+      linksCard.addEventListener("click", openLinksView);
+      sectionGrid.appendChild(linksCard);
+
       homeExtraGrid.innerHTML = "";
-      homeExtraGrid.className = "mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5";
+      homeExtraGrid.className = "mt-4 sm:mt-5";
 
       const pendingCount = getPendingPaymentRequests().length;
       const totalCount = loadPaymentRequests().length;
@@ -1355,21 +1370,6 @@
         '<p class="mt-4 text-sm font-medium text-emerald-600 group-hover:text-emerald-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入申請表</p>';
       paymentCard.addEventListener("click", openPaymentView);
       homeExtraGrid.appendChild(paymentCard);
-
-      const linksCount = loadUsefulLinks().length;
-      const linksCard = document.createElement("button");
-      linksCard.type = "button";
-      linksCard.className = "w-full text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-indigo-300 hover:shadow-xl transition group";
-      linksCard.innerHTML =
-        '<div class="flex items-center gap-3 mb-3">' +
-          '<span class="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-500 text-white">' +
-            '<i class="fa-solid fa-link"></i></span>' +
-          '<h3 class="text-lg sm:text-xl font-bold text-gray-800">有用連結</h3></div>' +
-        '<p class="text-sm text-gray-500"><i class="fa-solid fa-bookmark mr-1 text-gray-400"></i>常用網頁連結</p>' +
-        '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-list mr-1 text-gray-400"></i>連結：<span class="font-semibold text-gray-700">' + linksCount + "</span> 個</p>" +
-        '<p class="mt-4 text-sm font-medium text-indigo-600 group-hover:text-indigo-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入連結頁</p>';
-      linksCard.addEventListener("click", openLinksView);
-      homeExtraGrid.appendChild(linksCard);
     }
 
     function openSection(sectionId) {
