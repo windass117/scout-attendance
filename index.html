@@ -227,6 +227,14 @@
           </div>
 
           <div>
+            <label for="payment-cheque-payee" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-money-check mr-1 text-blue-600"></i>支票抬頭
+            </label>
+            <input type="text" id="payment-cheque-payee" required placeholder="請輸入支票抬頭"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+          </div>
+
+          <div>
             <label for="payment-receipt" class="block text-sm font-medium text-gray-700 mb-1">
               <i class="fa-solid fa-receipt mr-1 text-blue-600"></i>收據截圖
             </label>
@@ -432,6 +440,7 @@
     const paymentSection = document.getElementById("payment-section");
     const paymentPurpose = document.getElementById("payment-purpose");
     const paymentAmount = document.getElementById("payment-amount");
+    const paymentChequePayee = document.getElementById("payment-cheque-payee");
     const paymentReceipt = document.getElementById("payment-receipt");
     const paymentReceiptPreview = document.getElementById("payment-receipt-preview");
     const paymentReceiptImg = document.getElementById("payment-receipt-img");
@@ -876,7 +885,10 @@
         "</div>" +
         '<p class="text-gray-600 mb-1"><i class="fa-solid fa-phone mr-1 text-gray-400"></i>' + phoneDisplay + "</p>" +
         '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + escapeHtml(item.sectionName) + "</p>" +
-        '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + escapeHtml(item.purpose) + "</p>" +
+        '<p class="text-gray-600 mb-1"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + escapeHtml(item.purpose) + "</p>" +
+        (item.chequePayee
+          ? '<p class="text-gray-600 mb-1"><i class="fa-solid fa-money-check mr-1 text-gray-400"></i>支票抬頭：' + escapeHtml(item.chequePayee) + "</p>"
+          : "") +
         '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>提交：' + timeStr + "</p>";
 
       if (isProcessed && processedStr) {
@@ -1161,7 +1173,7 @@
         return;
       }
 
-      const rows = [["提交時間", "申請人", "電話", "支部", "款項用途", "金額（HKD）", "狀態", "處理時間", "收據"]];
+      const rows = [["提交時間", "申請人", "電話", "支部", "款項用途", "金額（HKD）", "支票抬頭", "狀態", "處理時間", "收據"]];
       requests.forEach(function (item) {
         const submitted = new Date(item.submittedAt);
         const submittedStr = isNaN(submitted.getTime()) ? item.submittedAt : submitted.toLocaleString("zh-Hant");
@@ -1174,6 +1186,7 @@
           item.sectionName || "",
           item.purpose || "",
           Number(item.amount || 0).toFixed(2),
+          item.chequePayee || "",
           item.processed ? "已處理" : "待處理",
           processedStr,
           item.receiptImage ? "有" : "無",
@@ -1815,6 +1828,7 @@
       const sectionId = paymentSection.value;
       const purpose = paymentPurpose.value.trim();
       const amount = parseFloat(paymentAmount.value);
+      const chequePayee = paymentChequePayee.value.trim();
 
       if (!applicantName) { showPaymentError("請輸入申請人姓名。"); return; }
       if (!phone) { showPaymentError("請輸入電話號碼。"); return; }
@@ -1822,6 +1836,7 @@
       if (!sectionId) { showPaymentError("請選擇支部。"); return; }
       if (!purpose) { showPaymentError("請輸入款項用途。"); return; }
       if (!amount || amount <= 0) { showPaymentError("請輸入有效金額。"); return; }
+      if (!chequePayee) { showPaymentError("請輸入支票抬頭。"); return; }
       if (!pendingReceiptDataUrl) { showPaymentError("請上傳收據截圖。"); return; }
 
       const sectionMeta = PAYMENT_SECTIONS.find(function (s) { return s.id === sectionId; });
@@ -1838,6 +1853,7 @@
           sectionName: sectionMeta ? sectionMeta.name : sectionId,
           purpose: purpose,
           amount: amount,
+          chequePayee: chequePayee,
           receiptImage: pendingReceiptDataUrl,
           processed: false,
           processedAt: null,
