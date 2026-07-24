@@ -43,10 +43,11 @@
           <i class="fa-solid fa-campground text-green-600 mr-2"></i>童軍集會點名
         </h1>
         <p class="text-sm sm:text-base text-gray-500 mt-2">
-          <i class="fa-solid fa-hand-pointer mr-1"></i>請選擇支部進入點名表
+          <i class="fa-solid fa-hand-pointer mr-1"></i>請選擇功能或支部
         </p>
       </header>
       <div id="section-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"></div>
+      <div id="home-extra-grid" class="mt-4 sm:mt-5"></div>
     </main>
   </div>
 
@@ -143,6 +144,95 @@
     </div>
   </div>
 
+  <!-- 申請款項 -->
+  <div id="payment-view" class="hidden min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="max-w-2xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+        <div class="flex items-center gap-3 mb-6">
+          <button id="payment-back-btn" type="button"
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+            <i class="fa-solid fa-arrow-left mr-1"></i>返回主版
+          </button>
+          <div>
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800">
+              <i class="fa-solid fa-file-invoice-dollar mr-2 text-emerald-600"></i>申請款項
+            </h2>
+            <p class="text-sm text-gray-500">填寫以下資料並上傳收據截圖</p>
+          </div>
+        </div>
+
+        <form id="payment-form" class="space-y-4">
+          <div>
+            <label for="payment-applicant" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-user mr-1 text-blue-600"></i>申請人姓名
+            </label>
+            <input type="text" id="payment-applicant" required placeholder="請輸入姓名"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+          </div>
+
+          <div>
+            <label for="payment-section" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-layer-group mr-1 text-blue-600"></i>支部
+            </label>
+            <select id="payment-section" required
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none bg-white">
+              <option value="">請選擇支部</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="payment-purpose" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-pen-to-square mr-1 text-blue-600"></i>款項用途
+            </label>
+            <input type="text" id="payment-purpose" required placeholder="例如：購買活動物資"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+          </div>
+
+          <div>
+            <label for="payment-amount" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-dollar-sign mr-1 text-blue-600"></i>金額（HKD）
+            </label>
+            <input type="number" id="payment-amount" required min="0.01" step="0.01" placeholder="0.00"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+          </div>
+
+          <div>
+            <label for="payment-receipt" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-receipt mr-1 text-blue-600"></i>收據截圖
+            </label>
+            <input type="file" id="payment-receipt" required accept="image/*"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100" />
+            <div id="payment-receipt-preview" class="mt-3 hidden">
+              <img id="payment-receipt-img" alt="收據預覽" class="max-h-48 rounded-lg border border-gray-200" />
+            </div>
+          </div>
+
+          <p id="payment-error" class="text-sm text-red-600 hidden" role="alert">
+            <i class="fa-solid fa-circle-exclamation mr-1"></i><span id="payment-error-text"></span>
+          </p>
+          <p id="payment-success" class="text-sm text-green-600 hidden">
+            <i class="fa-solid fa-circle-check mr-1"></i><span id="payment-success-text"></span>
+          </p>
+
+          <button type="submit" id="payment-submit-btn"
+            class="w-full rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition">
+            <i class="fa-solid fa-paper-plane mr-1"></i>提交申請
+          </button>
+        </form>
+
+        <section class="mt-8 border-t border-gray-200 pt-6">
+          <h3 class="text-base font-bold text-gray-800 mb-3">
+            <i class="fa-solid fa-list mr-1 text-emerald-600"></i>申請紀錄
+          </h3>
+          <div id="payment-list-empty" class="text-sm text-gray-400 py-4">
+            <i class="fa-solid fa-inbox mr-1"></i>尚無申請紀錄
+          </div>
+          <div id="payment-list" class="space-y-3 max-h-96 overflow-y-auto"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script>
     // 部署時請修改此設定（公開儲存庫，所有人無需登入即可共用資料）
     const GITHUB_CONFIG = {
@@ -164,9 +254,11 @@
     ];
 
     let currentSectionId = null;
+    let isPaymentView = false;
     let githubSha = null;
     let isSyncing = false;
-    let cache = { attendance: {}, history: [] };
+    let cache = { attendance: {}, history: [], paymentRequests: [] };
+    let pendingReceiptDataUrl = null;
 
     const toolbarRepo = document.getElementById("toolbar-repo");
     const syncStatus = document.getElementById("sync-status");
@@ -176,6 +268,8 @@
     const homeView = document.getElementById("home-view");
     const detailView = document.getElementById("detail-view");
     const sectionGrid = document.getElementById("section-grid");
+    const homeExtraGrid = document.getElementById("home-extra-grid");
+    const paymentView = document.getElementById("payment-view");
     const sectionTitle = document.getElementById("section-title");
     const backBtn = document.getElementById("back-btn");
     const newMemberInput = document.getElementById("new-member-input");
@@ -193,6 +287,22 @@
     const calcSuccessText = document.getElementById("calc-success-text");
     const historyEmpty = document.getElementById("history-empty");
     const historyList = document.getElementById("history-list");
+    const paymentBackBtn = document.getElementById("payment-back-btn");
+    const paymentForm = document.getElementById("payment-form");
+    const paymentApplicant = document.getElementById("payment-applicant");
+    const paymentSection = document.getElementById("payment-section");
+    const paymentPurpose = document.getElementById("payment-purpose");
+    const paymentAmount = document.getElementById("payment-amount");
+    const paymentReceipt = document.getElementById("payment-receipt");
+    const paymentReceiptPreview = document.getElementById("payment-receipt-preview");
+    const paymentReceiptImg = document.getElementById("payment-receipt-img");
+    const paymentError = document.getElementById("payment-error");
+    const paymentErrorText = document.getElementById("payment-error-text");
+    const paymentSuccess = document.getElementById("payment-success");
+    const paymentSuccessText = document.getElementById("payment-success-text");
+    const paymentSubmitBtn = document.getElementById("payment-submit-btn");
+    const paymentListEmpty = document.getElementById("payment-list-empty");
+    const paymentList = document.getElementById("payment-list");
 
     function getActiveToken() {
       if (GITHUB_CONFIG.defaultToken) return GITHUB_CONFIG.defaultToken;
@@ -275,6 +385,7 @@
       cache = {
         attendance: parsed.attendance || {},
         history: Array.isArray(parsed.history) ? parsed.history : [],
+        paymentRequests: Array.isArray(parsed.paymentRequests) ? parsed.paymentRequests : [],
       };
       return cache;
     }
@@ -290,14 +401,14 @@
       }
 
       if (res.status === 404) {
-        cache = { attendance: {}, history: [] };
+        cache = { attendance: {}, history: [], paymentRequests: [] };
         githubSha = null;
         return cache;
       }
 
       res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
       if (res.status === 404) {
-        cache = { attendance: {}, history: [] };
+        cache = { attendance: {}, history: [], paymentRequests: [] };
         githubSha = null;
         return cache;
       }
@@ -360,6 +471,7 @@
         if (res.status === 409) {
           await fetchFromGitHub();
           if (currentSectionId) renderTable();
+          else if (isPaymentView) renderPaymentList();
           else renderHome();
           throw new Error("資料已被其他人更新，已重新載入最新版本，請再試一次");
         }
@@ -538,6 +650,147 @@
       });
     }
 
+    function loadPaymentRequests() {
+      return cache.paymentRequests;
+    }
+
+    async function pushPaymentRequest(record) {
+      cache.paymentRequests.push(record);
+      await persistAll("新增款項申請");
+      return cache.paymentRequests;
+    }
+
+    function showPaymentError(message) {
+      paymentErrorText.textContent = message;
+      paymentError.classList.remove("hidden");
+      paymentSuccess.classList.add("hidden");
+    }
+
+    function hidePaymentError() {
+      paymentErrorText.textContent = "";
+      paymentError.classList.add("hidden");
+    }
+
+    function showPaymentSuccess(message) {
+      paymentSuccessText.textContent = message;
+      paymentSuccess.classList.remove("hidden");
+      paymentError.classList.add("hidden");
+    }
+
+    function hidePaymentSuccess() {
+      paymentSuccessText.textContent = "";
+      paymentSuccess.classList.add("hidden");
+    }
+
+    function populatePaymentSectionSelect() {
+      paymentSection.innerHTML = '<option value="">請選擇支部</option>';
+      SECTIONS.forEach(function (section) {
+        const opt = document.createElement("option");
+        opt.value = section.id;
+        opt.textContent = section.name;
+        paymentSection.appendChild(opt);
+      });
+    }
+
+    function readReceiptFile(file) {
+      return new Promise(function (resolve, reject) {
+        if (!file || !file.type.startsWith("image/")) {
+          reject(new Error("請上傳圖片格式的收據截圖。"));
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          reject(new Error("圖片過大，請上傳 5MB 以下的收據。"));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function () {
+          const img = new Image();
+          img.onload = function () {
+            const maxW = 1200;
+            let w = img.width;
+            let h = img.height;
+            if (w > maxW) {
+              h = Math.round(h * maxW / w);
+              w = maxW;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            let quality = 0.75;
+            let dataUrl = canvas.toDataURL("image/jpeg", quality);
+            while (dataUrl.length > 700000 && quality > 0.3) {
+              quality -= 0.1;
+              dataUrl = canvas.toDataURL("image/jpeg", quality);
+            }
+            if (dataUrl.length > 900000) {
+              reject(new Error("收據圖片壓縮後仍過大，請改用較小的圖片。"));
+              return;
+            }
+            resolve(dataUrl);
+          };
+          img.onerror = function () { reject(new Error("無法讀取圖片。")); };
+          img.src = reader.result;
+        };
+        reader.onerror = function () { reject(new Error("無法讀取檔案。")); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function resetPaymentForm() {
+      paymentForm.reset();
+      pendingReceiptDataUrl = null;
+      paymentReceiptPreview.classList.add("hidden");
+      paymentReceiptImg.src = "";
+    }
+
+    function renderPaymentList() {
+      const requests = loadPaymentRequests().slice().reverse();
+      paymentList.innerHTML = "";
+      paymentListEmpty.classList.toggle("hidden", requests.length > 0);
+
+      requests.forEach(function (item) {
+        const card = document.createElement("div");
+        card.className = "rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm";
+        const time = new Date(item.submittedAt);
+        const timeStr = isNaN(time.getTime()) ? item.submittedAt : time.toLocaleString("zh-Hant");
+        const amountStr = Number(item.amount).toFixed(2);
+        card.innerHTML =
+          '<div class="flex flex-wrap justify-between gap-2 mb-2">' +
+            '<p class="font-semibold text-gray-800"><i class="fa-solid fa-user mr-1 text-gray-400"></i>' + item.applicantName + "</p>" +
+            '<p class="font-bold text-emerald-700">$' + amountStr + "</p>" +
+          "</div>" +
+          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + item.sectionName + "</p>" +
+          '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + item.purpose + "</p>" +
+          '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>' + timeStr + "</p>" +
+          (item.receiptImage
+            ? '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium">' +
+                '<i class="fa-solid fa-image mr-1"></i>查看收據</a>'
+            : "");
+        paymentList.appendChild(card);
+      });
+    }
+
+    function openPaymentView() {
+      isPaymentView = true;
+      currentSectionId = null;
+      hidePaymentError();
+      hidePaymentSuccess();
+      resetPaymentForm();
+      populatePaymentSectionSelect();
+      homeView.classList.add("hidden");
+      detailView.classList.add("hidden");
+      paymentView.classList.remove("hidden");
+      renderPaymentList();
+    }
+
+    function closePaymentView() {
+      isPaymentView = false;
+      paymentView.classList.add("hidden");
+      homeView.classList.remove("hidden");
+      renderHome();
+    }
+
     function renderHome() {
       sectionGrid.innerHTML = "";
       const data = loadData();
@@ -557,13 +810,31 @@
         card.addEventListener("click", function () { openSection(section.id); });
         sectionGrid.appendChild(card);
       });
+
+      homeExtraGrid.innerHTML = "";
+      const paymentCount = loadPaymentRequests().length;
+      const paymentCard = document.createElement("button");
+      paymentCard.type = "button";
+      paymentCard.className = "w-full text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-emerald-300 hover:shadow-xl transition group";
+      paymentCard.innerHTML =
+        '<div class="flex items-center gap-3 mb-3">' +
+          '<span class="flex items-center justify-center w-9 h-9 rounded-full bg-emerald-500 text-white">' +
+            '<i class="fa-solid fa-file-invoice-dollar"></i></span>' +
+          '<h3 class="text-lg sm:text-xl font-bold text-gray-800">申請款項</h3></div>' +
+        '<p class="text-sm text-gray-500"><i class="fa-solid fa-receipt mr-1 text-gray-400"></i>提交報銷申請及收據截圖</p>' +
+        '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-list mr-1 text-gray-400"></i>已提交：<span class="font-semibold text-gray-700">' + paymentCount + "</span> 筆</p>" +
+        '<p class="mt-4 text-sm font-medium text-emerald-600 group-hover:text-emerald-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入申請表</p>';
+      paymentCard.addEventListener("click", openPaymentView);
+      homeExtraGrid.appendChild(paymentCard);
     }
 
     function openSection(sectionId) {
+      isPaymentView = false;
       currentSectionId = sectionId;
       const section = SECTIONS.find(function (s) { return s.id === sectionId; });
       sectionTitle.innerHTML = '<i class="fa-solid ' + section.icon + ' mr-2 text-blue-600"></i>' + section.name;
       homeView.classList.add("hidden");
+      paymentView.classList.add("hidden");
       detailView.classList.remove("hidden");
       hideError();
       newMemberInput.value = "";
@@ -577,6 +848,12 @@
       detailView.classList.add("hidden");
       homeView.classList.remove("hidden");
       renderHome();
+    }
+
+    function showCurrentViewAfterReload() {
+      if (currentSectionId) renderTable();
+      else if (isPaymentView) renderPaymentList();
+      else renderHome();
     }
 
     function renderTable() {
@@ -826,7 +1103,7 @@
         setSyncStatus("重新載入中…", "info");
         await fetchFromGitHub();
         if (currentSectionId) renderTable();
-        else renderHome();
+        else showCurrentViewAfterReload();
         setSyncStatus("已載入最新資料" + syncStatusSummary(), "success");
       } catch (err) {
         setSyncStatus("載入失敗", "error");
@@ -887,6 +1164,70 @@
     });
 
     backBtn.addEventListener("click", closeSection);
+    paymentBackBtn.addEventListener("click", closePaymentView);
+
+    paymentReceipt.addEventListener("change", async function () {
+      hidePaymentError();
+      const file = paymentReceipt.files[0];
+      if (!file) {
+        pendingReceiptDataUrl = null;
+        paymentReceiptPreview.classList.add("hidden");
+        paymentReceiptImg.src = "";
+        return;
+      }
+      try {
+        pendingReceiptDataUrl = await readReceiptFile(file);
+        paymentReceiptImg.src = pendingReceiptDataUrl;
+        paymentReceiptPreview.classList.remove("hidden");
+      } catch (err) {
+        pendingReceiptDataUrl = null;
+        paymentReceipt.value = "";
+        paymentReceiptPreview.classList.add("hidden");
+        showPaymentError(err.message);
+      }
+    });
+
+    paymentForm.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      hidePaymentError();
+      hidePaymentSuccess();
+
+      const applicantName = paymentApplicant.value.trim();
+      const sectionId = paymentSection.value;
+      const purpose = paymentPurpose.value.trim();
+      const amount = parseFloat(paymentAmount.value);
+
+      if (!applicantName) { showPaymentError("請輸入申請人姓名。"); return; }
+      if (!sectionId) { showPaymentError("請選擇支部。"); return; }
+      if (!purpose) { showPaymentError("請輸入款項用途。"); return; }
+      if (!amount || amount <= 0) { showPaymentError("請輸入有效金額。"); return; }
+      if (!pendingReceiptDataUrl) { showPaymentError("請上傳收據截圖。"); return; }
+
+      const sectionMeta = SECTIONS.find(function (s) { return s.id === sectionId; });
+      paymentSubmitBtn.disabled = true;
+      paymentSubmitBtn.textContent = "提交中…";
+
+      try {
+        await pushPaymentRequest({
+          id: Date.now(),
+          submittedAt: new Date().toISOString(),
+          applicantName: applicantName,
+          sectionId: sectionId,
+          sectionName: sectionMeta ? sectionMeta.name : sectionId,
+          purpose: purpose,
+          amount: amount,
+          receiptImage: pendingReceiptDataUrl,
+        });
+        resetPaymentForm();
+        renderPaymentList();
+        showPaymentSuccess("申請已提交並同步至 GitHub。");
+      } catch (err) {
+        showPaymentError(err.message);
+      } finally {
+        paymentSubmitBtn.disabled = false;
+        paymentSubmitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i>提交申請';
+      }
+    });
 
     initApp();
   </script>
