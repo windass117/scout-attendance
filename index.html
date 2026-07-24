@@ -811,6 +811,10 @@
         html += '<label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 cursor-pointer">' +
           '<input type="checkbox" class="payment-processed-cb rounded border-gray-300 text-green-600 focus:ring-green-500" data-id="' + item.id + '" />' +
           '<span class="font-medium text-gray-700">標記為已處理（並通知申請人）</span></label>';
+      } else {
+        html += '<div class="mt-3 pt-3 border-t border-green-200">' +
+          '<button type="button" class="payment-delete-btn text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50 transition" data-id="' + item.id + '">' +
+            '<i class="fa-solid fa-trash-can mr-0.5"></i>刪除紀錄</button></div>';
       }
 
       return html;
@@ -831,6 +835,8 @@
         card.innerHTML = buildPaymentCardHtml(item, { processed: true });
         paymentProcessedList.appendChild(card);
       });
+
+      bindProcessedPaymentListEvents();
     }
 
     function setPaymentProcessedPanelOpen(open) {
@@ -851,6 +857,31 @@
       Object.assign(req, updates);
       await persistAll("更新款項申請狀態");
       return req;
+    }
+
+    async function deletePaymentRequest(id) {
+      const index = cache.paymentRequests.findIndex(function (r) { return r.id === id; });
+      if (index === -1) throw new Error("找不到此申請紀錄。");
+      cache.paymentRequests.splice(index, 1);
+      await persistAll("刪除款項申請紀錄");
+    }
+
+    async function handlePaymentDelete(id) {
+      const item = cache.paymentRequests.find(function (r) { return r.id === id; });
+      if (!item) return;
+      const amountStr = Number(item.amount).toFixed(2);
+      if (!confirm("確定要永久刪除「" + item.applicantName + "」的申請（$" + amountStr + "）嗎？\n此操作無法復原。")) return;
+
+      try {
+        await deletePaymentRequest(id);
+        renderPaymentList();
+        if (getProcessedPaymentRequests("").length === 0) {
+          setPaymentProcessedPanelOpen(false);
+        }
+        setSyncStatus("已永久刪除申請紀錄", "success");
+      } catch (err) {
+        showPaymentError(err.message);
+      }
     }
 
     function normalizePhone(phone) {
@@ -1072,6 +1103,14 @@
         cb.addEventListener("change", function () {
           if (!cb.checked) return;
           handlePaymentProcessed(Number(cb.dataset.id), cb);
+        });
+      });
+    }
+
+    function bindProcessedPaymentListEvents() {
+      paymentProcessedList.querySelectorAll(".payment-delete-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          handlePaymentDelete(Number(btn.dataset.id));
         });
       });
     }
