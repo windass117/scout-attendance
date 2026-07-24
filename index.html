@@ -263,6 +263,30 @@
           </div>
           <div id="payment-list" class="space-y-3 max-h-96 overflow-y-auto"></div>
         </section>
+
+        <section class="mt-6 border-t border-gray-200 pt-6">
+          <button id="payment-processed-toggle" type="button"
+            class="w-full flex items-center justify-between gap-3 text-left rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 hover:bg-gray-100 transition">
+            <h3 class="text-base font-bold text-gray-800">
+              <i class="fa-solid fa-circle-check mr-1 text-green-600"></i>已處理紀錄
+              <span id="payment-processed-count" class="text-sm font-normal text-gray-500 ml-1">(0)</span>
+            </h3>
+            <i id="payment-processed-chevron" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+          </button>
+          <div id="payment-processed-panel" class="hidden mt-3">
+            <div class="mb-3">
+              <label for="payment-processed-filter" class="block text-xs text-gray-500 mb-1">篩選支部</label>
+              <select id="payment-processed-filter"
+                class="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none bg-white">
+                <option value="">全部支部</option>
+              </select>
+            </div>
+            <div id="payment-processed-empty" class="text-sm text-gray-400 py-4 hidden">
+              <i class="fa-solid fa-inbox mr-1"></i>尚無已處理紀錄
+            </div>
+            <div id="payment-processed-list" class="space-y-3 max-h-96 overflow-y-auto"></div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -345,6 +369,14 @@
     const paymentListEmpty = document.getElementById("payment-list-empty");
     const paymentList = document.getElementById("payment-list");
     const paymentExportBtn = document.getElementById("payment-export-btn");
+    const paymentProcessedToggle = document.getElementById("payment-processed-toggle");
+    const paymentProcessedPanel = document.getElementById("payment-processed-panel");
+    const paymentProcessedChevron = document.getElementById("payment-processed-chevron");
+    const paymentProcessedCount = document.getElementById("payment-processed-count");
+    const paymentProcessedFilter = document.getElementById("payment-processed-filter");
+    const paymentProcessedEmpty = document.getElementById("payment-processed-empty");
+    const paymentProcessedList = document.getElementById("payment-processed-list");
+    let paymentProcessedPanelOpen = false;
 
     function getActiveToken() {
       if (GITHUB_CONFIG.defaultToken) return GITHUB_CONFIG.defaultToken;
@@ -715,6 +747,98 @@
       return loadPaymentRequests().filter(function (item) { return !item.processed; });
     }
 
+    function getProcessedPaymentRequests(sectionId) {
+      return loadPaymentRequests().filter(function (item) {
+        if (!item.processed) return false;
+        if (sectionId && item.sectionId !== sectionId) return false;
+        return true;
+      });
+    }
+
+    function populatePaymentProcessedFilter() {
+      const current = paymentProcessedFilter.value;
+      paymentProcessedFilter.innerHTML = '<option value="">全部支部</option>';
+      PAYMENT_SECTIONS.forEach(function (section) {
+        const opt = document.createElement("option");
+        opt.value = section.id;
+        opt.textContent = section.name;
+        paymentProcessedFilter.appendChild(opt);
+      });
+      paymentProcessedFilter.value = current || "";
+    }
+
+    function buildPaymentCardHtml(item, options) {
+      options = options || {};
+      const isProcessed = !!options.processed;
+      const time = new Date(item.submittedAt);
+      const timeStr = isNaN(time.getTime()) ? item.submittedAt : time.toLocaleString("zh-Hant");
+      const processedTime = item.processedAt ? new Date(item.processedAt) : null;
+      const processedStr = processedTime && !isNaN(processedTime.getTime())
+        ? processedTime.toLocaleString("zh-Hant") : "";
+      const amountStr = Number(item.amount).toFixed(2);
+      const phoneDisplay = item.phone ? escapeHtml(item.phone) : "—";
+      const waUrl = getWhatsAppUrl(item);
+      const smsUrl = getSmsUrl(item);
+
+      let html =
+        '<div class="flex flex-wrap justify-between gap-2 mb-2">' +
+          '<p class="font-semibold text-gray-800"><i class="fa-solid fa-user mr-1 text-gray-400"></i>' + escapeHtml(item.applicantName) + "</p>" +
+          '<p class="font-bold text-emerald-700">$' + amountStr + "</p>" +
+        "</div>" +
+        '<p class="text-gray-600 mb-1"><i class="fa-solid fa-phone mr-1 text-gray-400"></i>' + phoneDisplay + "</p>" +
+        '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + escapeHtml(item.sectionName) + "</p>" +
+        '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + escapeHtml(item.purpose) + "</p>" +
+        '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>提交：' + timeStr + "</p>";
+
+      if (isProcessed && processedStr) {
+        html += '<p class="text-xs text-green-700 mb-2"><i class="fa-solid fa-circle-check mr-1"></i>處理：' + processedStr + "</p>";
+      }
+
+      if (item.receiptImage) {
+        html += '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">' +
+          '<i class="fa-solid fa-image mr-1"></i>查看收據</a>';
+      }
+      if (waUrl) {
+        html += '<a href="' + waUrl + '" target="_blank" rel="noopener" class="inline-flex items-center text-green-700 hover:text-green-900 text-xs font-medium mr-3">' +
+          '<i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp 通知</a>';
+      }
+      if (smsUrl) {
+        html += '<a href="' + smsUrl + '" class="inline-flex items-center text-blue-700 hover:text-blue-900 text-xs font-medium">' +
+          '<i class="fa-solid fa-comment-sms mr-1"></i>SMS 通知</a>';
+      }
+
+      if (!isProcessed) {
+        html += '<label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 cursor-pointer">' +
+          '<input type="checkbox" class="payment-processed-cb rounded border-gray-300 text-green-600 focus:ring-green-500" data-id="' + item.id + '" />' +
+          '<span class="font-medium text-gray-700">標記為已處理（並通知申請人）</span></label>';
+      }
+
+      return html;
+    }
+
+    function renderProcessedPaymentList() {
+      const filterSectionId = paymentProcessedFilter.value;
+      const requests = getProcessedPaymentRequests(filterSectionId).slice().reverse();
+      const totalProcessed = getProcessedPaymentRequests("").length;
+
+      paymentProcessedCount.textContent = "(" + totalProcessed + ")";
+      paymentProcessedList.innerHTML = "";
+      paymentProcessedEmpty.classList.toggle("hidden", requests.length > 0);
+
+      requests.forEach(function (item) {
+        const card = document.createElement("div");
+        card.className = "rounded-xl border border-green-200 bg-green-50/50 p-4 text-sm";
+        card.innerHTML = buildPaymentCardHtml(item, { processed: true });
+        paymentProcessedList.appendChild(card);
+      });
+    }
+
+    function setPaymentProcessedPanelOpen(open) {
+      paymentProcessedPanelOpen = open;
+      paymentProcessedPanel.classList.toggle("hidden", !open);
+      paymentProcessedChevron.classList.toggle("rotate-180", open);
+    }
+
     async function pushPaymentRequest(record) {
       cache.paymentRequests.push(record);
       await persistAll("新增款項申請");
@@ -794,6 +918,7 @@
           alert("已標記為已處理，但此申請沒有有效電話號碼，無法自動發送通知。");
         }
         renderPaymentList();
+        setPaymentProcessedPanelOpen(true);
         setSyncStatus("申請已標記為已處理", "success");
       } catch (err) {
         checkbox.checked = false;
@@ -894,41 +1019,12 @@
       requests.forEach(function (item) {
         const card = document.createElement("div");
         card.className = "rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm";
-        const time = new Date(item.submittedAt);
-        const timeStr = isNaN(time.getTime()) ? item.submittedAt : time.toLocaleString("zh-Hant");
-        const amountStr = Number(item.amount).toFixed(2);
-        const phoneDisplay = item.phone ? escapeHtml(item.phone) : "—";
-        const waUrl = getWhatsAppUrl(item);
-        const smsUrl = getSmsUrl(item);
-
-        card.innerHTML =
-          '<div class="flex flex-wrap justify-between gap-2 mb-2">' +
-            '<p class="font-semibold text-gray-800"><i class="fa-solid fa-user mr-1 text-gray-400"></i>' + escapeHtml(item.applicantName) + "</p>" +
-            '<p class="font-bold text-emerald-700">$' + amountStr + "</p>" +
-          "</div>" +
-          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-phone mr-1 text-gray-400"></i>' + phoneDisplay + "</p>" +
-          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + escapeHtml(item.sectionName) + "</p>" +
-          '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + escapeHtml(item.purpose) + "</p>" +
-          '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>提交：' + timeStr + "</p>" +
-          (item.receiptImage
-            ? '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">' +
-                '<i class="fa-solid fa-image mr-1"></i>查看收據</a>'
-            : "") +
-          (waUrl
-            ? '<a href="' + waUrl + '" target="_blank" rel="noopener" class="inline-flex items-center text-green-700 hover:text-green-900 text-xs font-medium mr-3">' +
-                '<i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp 通知</a>'
-            : "") +
-          (smsUrl
-            ? '<a href="' + smsUrl + '" class="inline-flex items-center text-blue-700 hover:text-blue-900 text-xs font-medium">' +
-                '<i class="fa-solid fa-comment-sms mr-1"></i>SMS 通知</a>'
-            : "") +
-          '<label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 cursor-pointer">' +
-            '<input type="checkbox" class="payment-processed-cb rounded border-gray-300 text-green-600 focus:ring-green-500" data-id="' + item.id + '" />' +
-            '<span class="font-medium text-gray-700">標記為已處理（並通知申請人）</span></label>';
+        card.innerHTML = buildPaymentCardHtml(item, { processed: false });
         paymentList.appendChild(card);
       });
 
       bindPaymentListEvents();
+      renderProcessedPaymentList();
     }
 
     function exportPaymentRequestsToExcel() {
@@ -987,6 +1083,8 @@
       hidePaymentSuccess();
       resetPaymentForm();
       populatePaymentSectionSelect();
+      populatePaymentProcessedFilter();
+      setPaymentProcessedPanelOpen(false);
       homeView.classList.add("hidden");
       detailView.classList.add("hidden");
       paymentView.classList.remove("hidden");
@@ -1393,6 +1491,10 @@
     backBtn.addEventListener("click", closeSection);
     paymentBackBtn.addEventListener("click", closePaymentView);
     paymentExportBtn.addEventListener("click", exportPaymentRequestsToExcel);
+    paymentProcessedToggle.addEventListener("click", function () {
+      setPaymentProcessedPanelOpen(!paymentProcessedPanelOpen);
+    });
+    paymentProcessedFilter.addEventListener("change", renderProcessedPaymentList);
 
     paymentReceipt.addEventListener("change", async function () {
       hidePaymentError();
