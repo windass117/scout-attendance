@@ -253,6 +253,10 @@
       { id: "rover", name: "樂行童軍", icon: "fa-compass", color: "bg-orange-500" },
     ];
 
+    const PAYMENT_SECTIONS = SECTIONS.concat([
+      { id: "troop", name: "旅部", icon: "fa-flag", color: "bg-gray-600" },
+    ]);
+
     let currentSectionId = null;
     let isPaymentView = false;
     let githubSha = null;
@@ -684,7 +688,7 @@
 
     function populatePaymentSectionSelect() {
       paymentSection.innerHTML = '<option value="">請選擇支部</option>';
-      SECTIONS.forEach(function (section) {
+      PAYMENT_SECTIONS.forEach(function (section) {
         const opt = document.createElement("option");
         opt.value = section.id;
         opt.textContent = section.name;
@@ -1203,8 +1207,7 @@
       if (!amount || amount <= 0) { showPaymentError("請輸入有效金額。"); return; }
       if (!pendingReceiptDataUrl) { showPaymentError("請上傳收據截圖。"); return; }
 
-      const sectionMeta = SECTIONS.find(function (s) { return s.id === sectionId; });
-      paymentSubmitBtn.disabled = true;
+      const sectionMeta = PAYMENT_SECTIONS.find(function (s) { return s.id === sectionId; });
       paymentSubmitBtn.textContent = "提交中…";
 
       try {
