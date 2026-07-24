@@ -171,6 +171,15 @@
           </div>
 
           <div>
+            <label for="payment-phone" class="block text-sm font-medium text-gray-700 mb-1">
+              <i class="fa-solid fa-phone mr-1 text-blue-600"></i>電話號碼
+            </label>
+            <input type="tel" id="payment-phone" required placeholder="例如：91234567 或 +85291234567"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+            <p class="text-xs text-gray-500 mt-1">用於款項處理完成後以 WhatsApp / SMS 通知</p>
+          </div>
+
+          <div>
             <label for="payment-section" class="block text-sm font-medium text-gray-700 mb-1">
               <i class="fa-solid fa-layer-group mr-1 text-blue-600"></i>支部
             </label>
@@ -294,6 +303,7 @@
     const paymentBackBtn = document.getElementById("payment-back-btn");
     const paymentForm = document.getElementById("payment-form");
     const paymentApplicant = document.getElementById("payment-applicant");
+    const paymentPhone = document.getElementById("payment-phone");
     const paymentSection = document.getElementById("payment-section");
     const paymentPurpose = document.getElementById("payment-purpose");
     const paymentAmount = document.getElementById("payment-amount");
@@ -664,6 +674,87 @@
       return cache.paymentRequests;
     }
 
+    async function updatePaymentRequest(id, updates) {
+      const req = cache.paymentRequests.find(function (r) { return r.id === id; });
+      if (!req) throw new Error("找不到此申請紀錄。");
+      Object.assign(req, updates);
+      await persistAll("更新款項申請狀態");
+      return req;
+    }
+
+    function normalizePhone(phone) {
+      const digits = (phone || "").replace(/\D/g, "");
+      if (!digits) return "";
+      if (digits.startsWith("852") && digits.length >= 11) return digits;
+      if (digits.length === 8) return "852" + digits;
+      return digits;
+    }
+
+    function isValidPhone(phone) {
+      const normalized = normalizePhone(phone);
+      return normalized.length >= 11 && normalized.startsWith("852");
+    }
+
+    function buildPaymentNotifyMessage(item) {
+      const amountStr = Number(item.amount).toFixed(2);
+      return "您好 " + item.applicantName + "，您提交的款項申請（" + item.sectionName +
+        "｜" + item.purpose + "｜HK$" + amountStr + "）已處理完成。如有疑問請聯絡旅部。";
+    }
+
+    function getWhatsAppUrl(item) {
+      const phone = normalizePhone(item.phone);
+      if (!phone) return "";
+      return "https://wa.me/" + phone + "?text=" + encodeURIComponent(buildPaymentNotifyMessage(item));
+    }
+
+    function getSmsUrl(item) {
+      const phone = normalizePhone(item.phone);
+      if (!phone) return "";
+      return "sms:+" + phone + "?body=" + encodeURIComponent(buildPaymentNotifyMessage(item));
+    }
+
+    function openPaymentNotify(item) {
+      const waUrl = getWhatsAppUrl(item);
+      const smsUrl = getSmsUrl(item);
+      if (waUrl) window.open(waUrl, "_blank", "noopener");
+      else if (smsUrl) window.location.href = smsUrl;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function handlePaymentProcessed(id, checkbox) {
+      const item = cache.paymentRequests.find(function (r) { return r.id === id; });
+      if (!item || item.processed) {
+        checkbox.checked = !!item && item.processed;
+        return;
+      }
+
+      checkbox.disabled = true;
+      try {
+        await updatePaymentRequest(id, {
+          processed: true,
+          processedAt: new Date().toISOString(),
+        });
+        if (item.phone && isValidPhone(item.phone)) {
+          openPaymentNotify(item);
+        } else {
+          alert("已標記為已處理，但此申請沒有有效電話號碼，無法自動發送通知。");
+        }
+        renderPaymentList();
+        setSyncStatus("申請已標記為已處理", "success");
+      } catch (err) {
+        checkbox.checked = false;
+        checkbox.disabled = false;
+        showPaymentError(err.message);
+      }
+    }
+
     function showPaymentError(message) {
       paymentErrorText.textContent = message;
       paymentError.classList.remove("hidden");
@@ -755,23 +846,61 @@
 
       requests.forEach(function (item) {
         const card = document.createElement("div");
-        card.className = "rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm";
+        const isProcessed = !!item.processed;
+        card.className = "rounded-xl border p-4 text-sm " +
+          (isProcessed ? "border-green-300 bg-green-50/60" : "border-gray-200 bg-gray-50");
         const time = new Date(item.submittedAt);
         const timeStr = isNaN(time.getTime()) ? item.submittedAt : time.toLocaleString("zh-Hant");
+        const processedTime = item.processedAt ? new Date(item.processedAt) : null;
+        const processedStr = processedTime && !isNaN(processedTime.getTime())
+          ? processedTime.toLocaleString("zh-Hant") : "";
         const amountStr = Number(item.amount).toFixed(2);
+        const phoneDisplay = item.phone ? escapeHtml(item.phone) : "—";
+        const waUrl = getWhatsAppUrl(item);
+        const smsUrl = getSmsUrl(item);
+
         card.innerHTML =
           '<div class="flex flex-wrap justify-between gap-2 mb-2">' +
-            '<p class="font-semibold text-gray-800"><i class="fa-solid fa-user mr-1 text-gray-400"></i>' + item.applicantName + "</p>" +
+            '<p class="font-semibold text-gray-800"><i class="fa-solid fa-user mr-1 text-gray-400"></i>' + escapeHtml(item.applicantName) + "</p>" +
             '<p class="font-bold text-emerald-700">$' + amountStr + "</p>" +
           "</div>" +
-          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + item.sectionName + "</p>" +
-          '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + item.purpose + "</p>" +
-          '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>' + timeStr + "</p>" +
+          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-phone mr-1 text-gray-400"></i>' + phoneDisplay + "</p>" +
+          '<p class="text-gray-600 mb-1"><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>' + escapeHtml(item.sectionName) + "</p>" +
+          '<p class="text-gray-600 mb-2"><i class="fa-solid fa-pen-to-square mr-1 text-gray-400"></i>' + escapeHtml(item.purpose) + "</p>" +
+          '<p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-clock mr-1"></i>提交：' + timeStr + "</p>" +
+          (isProcessed && processedStr
+            ? '<p class="text-xs text-green-700 mb-2"><i class="fa-solid fa-circle-check mr-1"></i>已處理：' + processedStr + "</p>"
+            : "") +
           (item.receiptImage
-            ? '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium">' +
+            ? '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">' +
                 '<i class="fa-solid fa-image mr-1"></i>查看收據</a>'
-            : "");
+            : "") +
+          (waUrl
+            ? '<a href="' + waUrl + '" target="_blank" rel="noopener" class="inline-flex items-center text-green-700 hover:text-green-900 text-xs font-medium mr-3">' +
+                '<i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp 通知</a>'
+            : "") +
+          (smsUrl
+            ? '<a href="' + smsUrl + '" class="inline-flex items-center text-blue-700 hover:text-blue-900 text-xs font-medium">' +
+                '<i class="fa-solid fa-comment-sms mr-1"></i>SMS 通知</a>'
+            : "") +
+          '<label class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 cursor-pointer">' +
+            '<input type="checkbox" class="payment-processed-cb rounded border-gray-300 text-green-600 focus:ring-green-500" ' +
+              'data-id="' + item.id + '" ' + (isProcessed ? "checked disabled" : "") + " />" +
+            '<span class="font-medium ' + (isProcessed ? "text-green-700" : "text-gray-700") + '">' +
+              (isProcessed ? "已處理" : "標記為已處理（並通知申請人）") +
+            "</span></label>";
         paymentList.appendChild(card);
+      });
+
+      bindPaymentListEvents();
+    }
+
+    function bindPaymentListEvents() {
+      paymentList.querySelectorAll(".payment-processed-cb:not(:disabled)").forEach(function (cb) {
+        cb.addEventListener("change", function () {
+          if (!cb.checked) return;
+          handlePaymentProcessed(Number(cb.dataset.id), cb);
+        });
       });
     }
 
@@ -1194,17 +1323,21 @@
       hidePaymentSuccess();
 
       const applicantName = paymentApplicant.value.trim();
+      const phone = paymentPhone.value.trim();
       const sectionId = paymentSection.value;
       const purpose = paymentPurpose.value.trim();
       const amount = parseFloat(paymentAmount.value);
 
       if (!applicantName) { showPaymentError("請輸入申請人姓名。"); return; }
+      if (!phone) { showPaymentError("請輸入電話號碼。"); return; }
+      if (!isValidPhone(phone)) { showPaymentError("請輸入有效的香港電話號碼（8 位數字）。"); return; }
       if (!sectionId) { showPaymentError("請選擇支部。"); return; }
       if (!purpose) { showPaymentError("請輸入款項用途。"); return; }
       if (!amount || amount <= 0) { showPaymentError("請輸入有效金額。"); return; }
       if (!pendingReceiptDataUrl) { showPaymentError("請上傳收據截圖。"); return; }
 
       const sectionMeta = PAYMENT_SECTIONS.find(function (s) { return s.id === sectionId; });
+      paymentSubmitBtn.disabled = true;
       paymentSubmitBtn.textContent = "提交中…";
 
       try {
@@ -1212,11 +1345,14 @@
           id: Date.now(),
           submittedAt: new Date().toISOString(),
           applicantName: applicantName,
+          phone: phone,
           sectionId: sectionId,
           sectionName: sectionMeta ? sectionMeta.name : sectionId,
           purpose: purpose,
           amount: amount,
           receiptImage: pendingReceiptDataUrl,
+          processed: false,
+          processedAt: null,
         });
         resetPaymentForm();
         renderPaymentList();
