@@ -113,6 +113,25 @@
           </div>
         </div>
 
+        <div class="rounded-xl border border-gray-200 p-4 bg-gray-50 mb-4">
+          <p class="text-sm font-medium text-gray-700 mb-2">
+            <i class="fa-solid fa-calendar-range mr-1 text-blue-600"></i>匯出日期範圍
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="export-date-from" class="block text-xs text-gray-500 mb-1">開始日期</label>
+              <input type="date" id="export-date-from"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+            </div>
+            <div>
+              <label for="export-date-to" class="block text-xs text-gray-500 mb-1">結束日期</label>
+              <input type="date" id="export-date-to"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none" />
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">出席率及匯出內容依所選日期範圍計算；留空則匯出全部日期</p>
+        </div>
+
         <div class="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
           <button id="calc-save-btn" type="button"
             class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors">
@@ -304,6 +323,8 @@
     const calcSaveBtn = document.getElementById("calc-save-btn");
     const calcSuccess = document.getElementById("calc-success");
     const calcSuccessText = document.getElementById("calc-success-text");
+    const exportDateFrom = document.getElementById("export-date-from");
+    const exportDateTo = document.getElementById("export-date-to");
     const historyEmpty = document.getElementById("history-empty");
     const historyList = document.getElementById("history-list");
     const paymentBackBtn = document.getElementById("payment-back-btn");
@@ -570,6 +591,20 @@
       return dates.slice().sort(function (a, b) { return b.localeCompare(a); });
     }
 
+    function filterDatesByRange(dates, from, to) {
+      return getDisplayDates(dates).filter(function (date) {
+        if (from && date < from) return false;
+        if (to && date > to) return false;
+        return true;
+      });
+    }
+
+    function updateExportDateDefaults(section) {
+      const sorted = section.dates.slice().sort();
+      exportDateFrom.value = sorted.length > 0 ? sorted[0] : "";
+      exportDateTo.value = sorted.length > 0 ? sorted[sorted.length - 1] : "";
+    }
+
     const ATTENDANCE = { PRESENT: "present", ABSENT: "absent", NA: "na" };
 
     function normalizeStatus(value) {
@@ -606,10 +641,11 @@
       return { text: "低", className: "text-red-600" };
     }
 
-    function calcMemberRate(section, member) {
+    function calcMemberRate(section, member, dates) {
+      const targetDates = dates || section.dates;
       let attended = 0;
       let total = 0;
-      section.dates.forEach(function (date) {
+      targetDates.forEach(function (date) {
         const status = normalizeStatus(section.attendance[member] && section.attendance[member][date]);
         if (status === ATTENDANCE.NA) return;
         total += 1;
@@ -1014,6 +1050,7 @@
       hideError();
       newMemberInput.value = "";
       newDateInput.value = new Date().toISOString().slice(0, 10);
+      updateExportDateDefaults(getSectionData(sectionId));
       renderTable();
       renderHistory();
     }
@@ -1184,17 +1221,33 @@
         return;
       }
 
+      const from = exportDateFrom.value;
+      const to = exportDateTo.value;
+      if (from && to && from > to) {
+        alert("開始日期不能晚於結束日期。");
+        return;
+      }
+
+      const exportDates = filterDatesByRange(section.dates, from, to);
+      if (exportDates.length === 0) {
+        alert("所選日期範圍內沒有集會紀錄。");
+        return;
+      }
+
       const wb = XLSX.utils.book_new();
-      const header = ["姓名"].concat(getDisplayDates(section.dates).map(formatDate)).concat(["出席率", "評估"]);
-      const rows = [header];
+      const periodLabel = (from || to)
+        ? "匯出範圍：" + (from || "最早") + " 至 " + (to || "最新")
+        : "匯出範圍：全部日期";
+      const header = ["姓名"].concat(exportDates.map(formatDate)).concat(["出席率", "評估"]);
+      const rows = [[periodLabel], header];
 
       section.members.forEach(function (member) {
         const row = [member];
-        getDisplayDates(section.dates).forEach(function (date) {
+        exportDates.forEach(function (date) {
           const raw = section.attendance[member] && section.attendance[member][date];
           row.push(statusLabelForExport(raw));
         });
-        const stats = calcMemberRate(section, member);
+        const stats = calcMemberRate(section, member, exportDates);
         row.push(stats.rate.toFixed(1) + "%", stats.level.text);
         rows.push(row);
       });
@@ -1215,7 +1268,9 @@
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(histRows), "計算紀錄");
       }
 
-      const filename = "童軍集會點名_" + sectionName + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+      let filename = "童軍集會點名_" + sectionName;
+      if (from || to) filename += "_" + (from || "起") + "_" + (to || "止");
+      filename += "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
       XLSX.writeFile(wb, filename);
       setSyncStatus("已匯出 " + sectionName + " Excel", "success");
     }
