@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>1833領袖專區</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body class="min-h-screen bg-gray-100">
@@ -141,7 +141,7 @@
           </button>
           <button id="export-btn" type="button"
             class="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
-            <i class="fa-solid fa-file-excel mr-1 text-green-600"></i>匯出 Excel
+            <i class="fa-solid fa-file-pdf mr-1 text-red-600"></i>匯出 PDF
           </button>
           <p id="calc-success" class="text-sm text-green-600 hidden">
             <i class="fa-solid fa-circle-check mr-1"></i><span id="calc-success-text"></span>
@@ -265,7 +265,7 @@
             </h3>
             <button id="payment-export-btn" type="button"
               class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
-              <i class="fa-solid fa-file-excel mr-1 text-green-600"></i>匯出 Excel（全部紀錄）
+              <i class="fa-solid fa-file-pdf mr-1 text-red-600"></i>匯出 PDF（全部紀錄）
             </button>
         </div>
           <div id="payment-list-empty" class="text-sm text-gray-400 py-4">
@@ -1023,6 +1023,151 @@
       else if (smsUrl) window.location.href = smsUrl;
     }
 
+    function getPdfTableFontSize(colCount, rowCount) {
+      const score = colCount * 1.4 + rowCount * 1.1;
+      if (score > 55) return 6;
+      if (score > 40) return 7;
+      if (score > 28) return 8;
+      if (score > 18) return 9;
+      return 10;
+    }
+
+    function downloadPdfFromHtml(html, filename, landscape) {
+      if (typeof html2pdf === "undefined") {
+        alert("PDF 匯出套件載入失敗，請重新整理頁面後再試。");
+        return Promise.reject(new Error("html2pdf not loaded"));
+      }
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-1;";
+      wrapper.innerHTML = html;
+      document.body.appendChild(wrapper);
+      const element = wrapper.firstElementChild;
+
+      const marginMm = 6;
+      const pageHmm = landscape ? 210 : 297;
+      const maxContentPx = (pageHmm - marginMm * 2) * 3.78;
+      const contentH = element.scrollHeight;
+      if (contentH > maxContentPx) {
+        const scale = maxContentPx / contentH;
+        element.style.transform = "scale(" + scale + ")";
+        element.style.transformOrigin = "top left";
+        wrapper.style.height = Math.ceil(contentH * scale) + "px";
+        wrapper.style.width = Math.ceil(element.scrollWidth * scale) + "px";
+        wrapper.style.overflow = "hidden";
+      }
+
+      return html2pdf()
+        .set({
+          margin: [marginMm, marginMm, marginMm, marginMm],
+          filename: filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: landscape ? "landscape" : "portrait" },
+          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+        })
+        .from(element)
+        .save()
+        .finally(function () {
+          document.body.removeChild(wrapper);
+        });
+    }
+
+    function buildSectionPdfHtml(sectionName, periodLabel, exportDates, sortedMembers, section) {
+      const colCount = exportDates.length + 3;
+      const rowCount = sortedMembers.length;
+      const fontSize = getPdfTableFontSize(colCount, rowCount);
+      const pad = fontSize <= 7 ? "2px 3px" : "3px 4px";
+      const now = new Date().toLocaleString("zh-Hant");
+      let headerCells = '<th style="padding:' + pad + ';border:1px solid #1e40af;background:#2563eb;color:#fff;text-align:left;min-width:48px;">姓名</th>';
+      exportDates.forEach(function (date) {
+        headerCells += '<th style="padding:' + pad + ';border:1px solid #1e40af;background:#2563eb;color:#fff;text-align:center;white-space:nowrap;">' + escapeHtml(formatDate(date)) + "</th>";
+      });
+      headerCells += '<th style="padding:' + pad + ';border:1px solid #1e40af;background:#2563eb;color:#fff;text-align:center;">出席率</th>';
+      headerCells += '<th style="padding:' + pad + ';border:1px solid #1e40af;background:#2563eb;color:#fff;text-align:center;">評估</th>';
+
+      let bodyRows = "";
+      sortedMembers.forEach(function (member, idx) {
+        const stats = calcMemberRate(section, member, exportDates);
+        let cells = '<td style="padding:' + pad + ';border:1px solid #d1d5db;text-align:left;font-weight:500;">' + escapeHtml(member) + "</td>";
+        exportDates.forEach(function (date) {
+          const raw = section.attendance[member] && section.attendance[member][date];
+          const label = statusLabelForExport(raw);
+          let color = label === "出席" ? "#166534" : label === "缺席" ? "#b91c1c" : "#6b7280";
+          cells += '<td style="padding:' + pad + ';border:1px solid #d1d5db;text-align:center;color:' + color + ';">' + label + "</td>";
+        });
+        cells += '<td style="padding:' + pad + ';border:1px solid #d1d5db;text-align:center;font-weight:bold;">' + stats.rate.toFixed(1) + "%</td>";
+        cells += '<td style="padding:' + pad + ';border:1px solid #d1d5db;text-align:center;">' + stats.level.text + "</td>";
+        const bg = idx % 2 === 1 ? "background:#f9fafb;" : "";
+        bodyRows += "<tr style=\"" + bg + "\">" + cells + "</tr>";
+      });
+
+      return (
+        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:277mm;box-sizing:border-box;color:#111827;">' +
+        '<div style="border-bottom:2px solid #2563eb;padding-bottom:6px;margin-bottom:8px;">' +
+        '<div style="font-size:15px;font-weight:bold;color:#1e3a8a;">1833領袖專區 · ' + escapeHtml(sectionName) + " 出席登記表</div>" +
+        '<div style="font-size:' + Math.max(fontSize, 8) + 'px;color:#4b5563;margin-top:4px;">' +
+        escapeHtml(periodLabel) + "　|　匯出時間：" + now +
+        "</div></div>" +
+        '<table style="width:100%;border-collapse:collapse;font-size:' + fontSize + 'px;table-layout:fixed;">' +
+        "<thead><tr>" + headerCells + "</tr></thead>" +
+        "<tbody>" + bodyRows + "</tbody></table>" +
+        '<div style="font-size:' + Math.max(fontSize - 1, 6) + 'px;color:#6b7280;margin-top:6px;">' +
+        "備註：「未加入」不計入出席率；成員依出席率由高至低排列。" +
+        "</div></div>"
+      );
+    }
+
+    function buildPaymentPdfHtml(requests) {
+      const rowCount = requests.length;
+      const fontSize = getPdfTableFontSize(10, rowCount);
+      const pad = fontSize <= 7 ? "2px 3px" : "3px 4px";
+      const now = new Date().toLocaleString("zh-Hant");
+      let bodyRows = "";
+      requests.forEach(function (item, idx) {
+        const submitted = new Date(item.submittedAt);
+        const submittedStr = isNaN(submitted.getTime()) ? (item.submittedAt || "") : submitted.toLocaleString("zh-Hant", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        const processed = item.processedAt ? new Date(item.processedAt) : null;
+        const processedStr = processed && !isNaN(processed.getTime()) ? processed.toLocaleString("zh-Hant", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+        const bg = idx % 2 === 1 ? "background:#f9fafb;" : "";
+        const statusColor = item.processed ? "#166534" : "#b45309";
+        bodyRows +=
+          "<tr style=\"" + bg + "\">" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;white-space:nowrap;\">" + escapeHtml(submittedStr) + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;\">" + escapeHtml(item.applicantName || "") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;\">" + escapeHtml(item.phone || "") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;\">" + escapeHtml(item.sectionName || "") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;\">" + escapeHtml(item.purpose || "") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;text-align:right;white-space:nowrap;\">" + Number(item.amount || 0).toFixed(2) + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;\">" + escapeHtml(item.chequePayee || "") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;text-align:center;color:" + statusColor + ";\">" + (item.processed ? "已處理" : "待處理") + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;white-space:nowrap;\">" + escapeHtml(processedStr) + "</td>" +
+          "<td style=\"padding:" + pad + ";border:1px solid #d1d5db;text-align:center;\">" + (item.receiptImage ? "有" : "無") + "</td>" +
+          "</tr>";
+      });
+
+      const thStyle = "padding:" + pad + ";border:1px solid #047857;background:#059669;color:#fff;text-align:center;font-weight:bold;";
+      return (
+        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:198mm;box-sizing:border-box;color:#111827;">' +
+        '<div style="border-bottom:2px solid #059669;padding-bottom:6px;margin-bottom:8px;">' +
+        '<div style="font-size:15px;font-weight:bold;color:#065f46;">1833領袖專區 · 款項申請紀錄</div>' +
+        '<div style="font-size:' + Math.max(fontSize, 8) + 'px;color:#4b5563;margin-top:4px;">共 ' + requests.length + " 筆　|　匯出時間：" + now +
+        "</div></div>" +
+        '<table style="width:100%;border-collapse:collapse;font-size:' + fontSize + 'px;table-layout:fixed;">' +
+        "<thead><tr>" +
+        "<th style=\"" + thStyle + "\">提交</th>" +
+        "<th style=\"" + thStyle + "\">申請人</th>" +
+        "<th style=\"" + thStyle + "\">電話</th>" +
+        "<th style=\"" + thStyle + "\">支部</th>" +
+        "<th style=\"" + thStyle + "\">用途</th>" +
+        "<th style=\"" + thStyle + "\">金額</th>" +
+        "<th style=\"" + thStyle + "\">支票抬頭</th>" +
+        "<th style=\"" + thStyle + "\">狀態</th>" +
+        "<th style=\"" + thStyle + "\">處理</th>" +
+        "<th style=\"" + thStyle + "\">收據</th>" +
+        "</tr></thead><tbody>" + bodyRows + "</tbody></table></div>"
+      );
+    }
+
     function escapeHtml(text) {
       return String(text)
         .replace(/&/g, "&amp;")
@@ -1159,12 +1304,7 @@
       renderProcessedPaymentList();
     }
 
-    function exportPaymentRequestsToExcel() {
-      if (typeof XLSX === "undefined") {
-        alert("Excel 匯出套件載入失敗，請重新整理頁面後再試。");
-        return;
-      }
-
+    function exportPaymentRequestsToPdf() {
       const requests = loadPaymentRequests().slice().sort(function (a, b) {
         return (b.submittedAt || "").localeCompare(a.submittedAt || "");
       });
@@ -1173,31 +1313,13 @@
         return;
       }
 
-      const rows = [["提交時間", "申請人", "電話", "支部", "款項用途", "金額（HKD）", "支票抬頭", "狀態", "處理時間", "收據"]];
-      requests.forEach(function (item) {
-        const submitted = new Date(item.submittedAt);
-        const submittedStr = isNaN(submitted.getTime()) ? item.submittedAt : submitted.toLocaleString("zh-Hant");
-        const processed = item.processedAt ? new Date(item.processedAt) : null;
-        const processedStr = processed && !isNaN(processed.getTime()) ? processed.toLocaleString("zh-Hant") : "";
-        rows.push([
-          submittedStr,
-          item.applicantName || "",
-          item.phone || "",
-          item.sectionName || "",
-          item.purpose || "",
-          Number(item.amount || 0).toFixed(2),
-          item.chequePayee || "",
-          item.processed ? "已處理" : "待處理",
-          processedStr,
-          item.receiptImage ? "有" : "無",
-        ]);
-      });
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "款項申請");
-      const filename = "款項申請紀錄_" + new Date().toISOString().slice(0, 10) + ".xlsx";
-      XLSX.writeFile(wb, filename);
-      setSyncStatus("已匯出全部申請 Excel", "success");
+      const html = buildPaymentPdfHtml(requests);
+      const filename = "款項申請紀錄_" + new Date().toISOString().slice(0, 10) + ".pdf";
+      downloadPdfFromHtml(html, filename, false)
+        .then(function () {
+          setSyncStatus("已匯出全部申請 PDF", "success");
+        })
+        .catch(function () {});
     }
 
     function bindPaymentListEvents() {
@@ -1555,11 +1677,7 @@
       });
     }
 
-    function exportSectionToExcel() {
-      if (typeof XLSX === "undefined") {
-        alert("Excel 匯出套件載入失敗，請重新整理頁面後再試。");
-        return;
-      }
+    function exportSectionToPdf() {
       if (!currentSectionId) return;
 
       const sectionMeta = SECTIONS.find(function (s) { return s.id === currentSectionId; });
@@ -1585,49 +1703,24 @@
         return;
       }
 
-      const wb = XLSX.utils.book_new();
       const periodLabel = (from || to)
         ? "匯出範圍：" + (from || "最早") + " 至 " + (to || "最新")
         : "匯出範圍：全部日期";
-      const header = ["姓名"].concat(exportDates.map(formatDate)).concat(["出席率", "評估"]);
-      const rows = [[periodLabel], header];
 
       const sortedMembers = section.members.slice().sort(function (a, b) {
         return calcMemberRate(section, b, exportDates).rate - calcMemberRate(section, a, exportDates).rate;
       });
 
-      sortedMembers.forEach(function (member) {
-        const row = [member];
-        exportDates.forEach(function (date) {
-          const raw = section.attendance[member] && section.attendance[member][date];
-          row.push(statusLabelForExport(raw));
-        });
-        const stats = calcMemberRate(section, member, exportDates);
-        row.push(stats.rate.toFixed(1) + "%", stats.level.text);
-        rows.push(row);
-      });
-
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "出席登記");
-
-      const sectionHistory = loadHistory().filter(function (item) {
-        return item.sectionId === currentSectionId;
-      });
-      if (sectionHistory.length > 0) {
-        const histRows = [["時間", "姓名", "出席次數", "總集會次數", "出席率", "評估"]];
-        sectionHistory.forEach(function (item) {
-          const timeStr = new Date(item.calculatedAt).toLocaleString("zh-Hant");
-          (item.results || []).forEach(function (r) {
-            histRows.push([timeStr, r.name, r.attended, r.total, r.rate + "%", r.level]);
-          });
-        });
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(histRows), "計算紀錄");
-      }
-
+      const html = buildSectionPdfHtml(sectionName, periodLabel, exportDates, sortedMembers, section);
       let filename = "童軍集會點名_" + sectionName;
       if (from || to) filename += "_" + (from || "起") + "_" + (to || "止");
-      filename += "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
-      XLSX.writeFile(wb, filename);
-      setSyncStatus("已匯出 " + sectionName + " Excel", "success");
+      filename += "_" + new Date().toISOString().slice(0, 10) + ".pdf";
+
+      downloadPdfFromHtml(html, filename, true)
+        .then(function () {
+          setSyncStatus("已匯出 " + sectionName + " PDF", "success");
+        })
+        .catch(function () {});
     }
 
     async function initApp() {
@@ -1677,7 +1770,7 @@
       setSyncStatus("Token 已驗證並儲存", "success");
     });
 
-    exportBtn.addEventListener("click", exportSectionToExcel);
+    exportBtn.addEventListener("click", exportSectionToPdf);
 
     refreshBtn.addEventListener("click", async function () {
       try {
@@ -1747,7 +1840,7 @@
 
     backBtn.addEventListener("click", closeSection);
     paymentBackBtn.addEventListener("click", closePaymentView);
-    paymentExportBtn.addEventListener("click", exportPaymentRequestsToExcel);
+    paymentExportBtn.addEventListener("click", exportPaymentRequestsToPdf);
     paymentProcessedToggle.addEventListener("click", function () {
       setPaymentProcessedPanelOpen(!paymentProcessedPanelOpen);
     });
