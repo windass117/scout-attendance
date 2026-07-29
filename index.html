@@ -1037,39 +1037,79 @@
         alert("PDF 匯出套件載入失敗，請重新整理頁面後再試。");
         return Promise.reject(new Error("html2pdf not loaded"));
       }
-      const wrapper = document.createElement("div");
-      wrapper.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-1;";
-      wrapper.innerHTML = html;
-      document.body.appendChild(wrapper);
-      const element = wrapper.firstElementChild;
 
       const marginMm = 6;
       const pageHmm = landscape ? 210 : 297;
-      const maxContentPx = (pageHmm - marginMm * 2) * 3.78;
-      const contentH = element.scrollHeight;
-      if (contentH > maxContentPx) {
-        const scale = maxContentPx / contentH;
-        element.style.transform = "scale(" + scale + ")";
-        element.style.transformOrigin = "top left";
-        wrapper.style.height = Math.ceil(contentH * scale) + "px";
-        wrapper.style.width = Math.ceil(element.scrollWidth * scale) + "px";
-        wrapper.style.overflow = "hidden";
+      const contentWidthMm = landscape ? 285 : 198;
+      const maxContentPx = (pageHmm - marginMm * 2) * 3.7795275591;
+
+      const host = document.createElement("div");
+      host.setAttribute("aria-hidden", "true");
+      host.style.cssText = [
+        "position:fixed",
+        "left:0",
+        "top:0",
+        "width:" + contentWidthMm + "mm",
+        "background:#ffffff",
+        "opacity:0.01",
+        "pointer-events:none",
+        "z-index:2147483647",
+      ].join(";");
+      host.innerHTML = html;
+      document.body.appendChild(host);
+
+      const element = host.firstElementChild;
+      if (!element) {
+        document.body.removeChild(host);
+        alert("PDF 內容產生失敗，請重試。");
+        return Promise.reject(new Error("missing pdf element"));
       }
 
-      return html2pdf()
-        .set({
-          margin: [marginMm, marginMm, marginMm, marginMm],
-          filename: filename,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: "mm", format: "a4", orientation: landscape ? "landscape" : "portrait" },
-          pagebreak: { mode: ["avoid-all", "css", "legacy"] },
-        })
-        .from(element)
-        .save()
-        .finally(function () {
-          document.body.removeChild(wrapper);
+      function shrinkToFit() {
+        let contentH = element.scrollHeight;
+        if (contentH <= maxContentPx) return;
+        const ratio = maxContentPx / contentH;
+        element.querySelectorAll("table").forEach(function (table) {
+          const current = parseFloat(table.style.fontSize) || 10;
+          table.style.fontSize = Math.max(6, Math.floor(current * ratio * 10) / 10) + "px";
         });
+        element.querySelectorAll("div").forEach(function (block) {
+          const size = window.getComputedStyle(block).fontSize;
+          const current = parseFloat(size) || 10;
+          if (current >= 12) {
+            block.style.fontSize = Math.max(8, Math.floor(current * ratio * 10) / 10) + "px";
+          }
+        });
+      }
+
+      shrinkToFit();
+
+      return new Promise(function (resolve) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(resolve);
+        });
+      }).then(function () {
+        return html2pdf()
+          .set({
+            margin: marginMm,
+            filename: filename,
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              scrollX: 0,
+              scrollY: 0,
+              backgroundColor: "#ffffff",
+            },
+            jsPDF: { unit: "mm", format: "a4", orientation: landscape ? "landscape" : "portrait" },
+            pagebreak: { mode: ["css", "legacy"] },
+          })
+          .from(element)
+          .save();
+      }).finally(function () {
+        if (host.parentNode) document.body.removeChild(host);
+      });
     }
 
     function buildSectionPdfHtml(sectionName, periodLabel, exportDates, sortedMembers, section) {
@@ -1102,7 +1142,7 @@
       });
 
       return (
-        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:277mm;box-sizing:border-box;color:#111827;">' +
+        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:100%;box-sizing:border-box;color:#111827;background:#ffffff;">' +
         '<div style="border-bottom:2px solid #2563eb;padding-bottom:6px;margin-bottom:8px;">' +
         '<div style="font-size:15px;font-weight:bold;color:#1e3a8a;">1833領袖專區 · ' + escapeHtml(sectionName) + " 出席登記表</div>" +
         '<div style="font-size:' + Math.max(fontSize, 8) + 'px;color:#4b5563;margin-top:4px;">' +
@@ -1147,7 +1187,7 @@
 
       const thStyle = "padding:" + pad + ";border:1px solid #047857;background:#059669;color:#fff;text-align:center;font-weight:bold;";
       return (
-        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:198mm;box-sizing:border-box;color:#111827;">' +
+        '<div style="font-family:Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif;width:100%;box-sizing:border-box;color:#111827;background:#ffffff;">' +
         '<div style="border-bottom:2px solid #059669;padding-bottom:6px;margin-bottom:8px;">' +
         '<div style="font-size:15px;font-weight:bold;color:#065f46;">1833領袖專區 · 款項申請紀錄</div>' +
         '<div style="font-size:' + Math.max(fontSize, 8) + 'px;color:#4b5563;margin-top:4px;">共 ' + requests.length + " 筆　|　匯出時間：" + now +
@@ -1319,7 +1359,10 @@
         .then(function () {
           setSyncStatus("已匯出全部申請 PDF", "success");
         })
-        .catch(function () {});
+        .catch(function (err) {
+          console.error("PDF export failed:", err);
+          alert("PDF 匯出失敗，請重試。");
+        });
     }
 
     function bindPaymentListEvents() {
@@ -1720,7 +1763,10 @@
         .then(function () {
           setSyncStatus("已匯出 " + sectionName + " PDF", "success");
         })
-        .catch(function () {});
+        .catch(function (err) {
+          console.error("PDF export failed:", err);
+          alert("PDF 匯出失敗，請重試。");
+        });
     }
 
     async function initApp() {
