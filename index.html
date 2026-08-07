@@ -338,6 +338,60 @@
     </div>
   </div>
 
+  <!-- 會費 -->
+  <div id="fees-view" class="hidden min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="max-w-5xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <button id="fees-back-btn" type="button"
+              class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              <i class="fa-solid fa-arrow-left mr-1"></i>返回主版
+            </button>
+            <div>
+              <h2 class="text-xl sm:text-2xl font-bold text-gray-800">
+                <i class="fa-solid fa-coins mr-2 text-amber-600"></i>會費
+              </h2>
+              <p class="text-sm text-gray-500">登記各支部成員每半年會費繳交狀況</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 text-sm text-amber-900">
+          <p class="font-medium mb-1"><i class="fa-solid fa-circle-info mr-1"></i>會費標準（每半年）</p>
+          <p>小童軍、幼童軍：<span class="font-semibold">$240</span>　|　童軍、深資童軍、樂行童軍：<span class="font-semibold">$300</span></p>
+          <p class="text-xs text-amber-800 mt-1">成員名單自動取自各支部點名表；請先在支部新增成員。</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div class="flex items-center gap-2">
+            <button id="fees-period-prev" type="button"
+              class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+              title="上一期">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <div class="text-center min-w-[8rem]">
+              <p id="fees-period-label" class="text-base font-bold text-gray-800"></p>
+              <p id="fees-period-key" class="text-xs text-gray-500"></p>
+            </div>
+            <button id="fees-period-next" type="button"
+              class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+              title="下一期">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+          <div id="fees-summary" class="text-sm text-gray-600 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2"></div>
+        </div>
+
+        <p id="fees-error" class="mb-4 text-sm text-red-600 hidden" role="alert">
+          <i class="fa-solid fa-circle-exclamation mr-1"></i><span id="fees-error-text"></span>
+        </p>
+
+        <div id="fees-sections" class="space-y-4"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 新增連結小視窗 -->
   <div id="link-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div id="link-modal-backdrop" class="absolute inset-0 bg-black/40"></div>
@@ -395,12 +449,22 @@
       { id: "troop", name: "旅部", icon: "fa-flag", color: "bg-gray-600" },
     ]);
 
+    const MEMBERSHIP_FEE_AMOUNTS = {
+      grasshopper: 240,
+      cub: 240,
+      scout: 300,
+      venture: 300,
+      rover: 300,
+    };
+
     let currentSectionId = null;
     let isPaymentView = false;
     let isLinksView = false;
+    let isFeesView = false;
+    let currentFeePeriod = null;
     let githubSha = null;
     let isSyncing = false;
-    let cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [] };
+    let cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
     let pendingReceiptDataUrl = null;
 
     const toolbarRepo = document.getElementById("toolbar-repo");
@@ -414,6 +478,7 @@
     const homeExtraGrid = document.getElementById("home-extra-grid");
     const paymentView = document.getElementById("payment-view");
     const linksView = document.getElementById("links-view");
+    const feesView = document.getElementById("fees-view");
     const sectionTitle = document.getElementById("section-title");
     const backBtn = document.getElementById("back-btn");
     const newMemberInput = document.getElementById("new-member-input");
@@ -473,6 +538,15 @@
     const linkModalError = document.getElementById("link-modal-error");
     const linkModalCancel = document.getElementById("link-modal-cancel");
     const linkModalSave = document.getElementById("link-modal-save");
+    const feesBackBtn = document.getElementById("fees-back-btn");
+    const feesPeriodPrev = document.getElementById("fees-period-prev");
+    const feesPeriodNext = document.getElementById("fees-period-next");
+    const feesPeriodLabel = document.getElementById("fees-period-label");
+    const feesPeriodKey = document.getElementById("fees-period-key");
+    const feesSummary = document.getElementById("fees-summary");
+    const feesError = document.getElementById("fees-error");
+    const feesErrorText = document.getElementById("fees-error-text");
+    const feesSections = document.getElementById("fees-sections");
 
     function getActiveToken() {
       if (GITHUB_CONFIG.defaultToken) return GITHUB_CONFIG.defaultToken;
@@ -557,6 +631,7 @@
         history: Array.isArray(parsed.history) ? parsed.history : [],
         paymentRequests: Array.isArray(parsed.paymentRequests) ? parsed.paymentRequests : [],
         usefulLinks: Array.isArray(parsed.usefulLinks) ? parsed.usefulLinks : [],
+        membershipFees: parsed.membershipFees && typeof parsed.membershipFees === "object" ? parsed.membershipFees : {},
       };
       return cache;
     }
@@ -572,14 +647,14 @@
       }
 
       if (res.status === 404) {
-        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [] };
+        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
         githubSha = null;
         return cache;
       }
 
       res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
       if (res.status === 404) {
-        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [] };
+        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
         githubSha = null;
         return cache;
       }
@@ -643,6 +718,7 @@
           await fetchFromGitHub();
           if (currentSectionId) renderTable();
           else if (isPaymentView) renderPaymentList();
+          else if (isFeesView) renderFeesView();
           else if (isLinksView) renderLinksList();
           else renderHome();
           throw new Error("資料已被其他人更新，已重新載入最新版本，請再試一次");
@@ -1385,6 +1461,7 @@
     function openPaymentView() {
       isPaymentView = true;
       isLinksView = false;
+      isFeesView = false;
       currentSectionId = null;
       hidePaymentError();
       hidePaymentSuccess();
@@ -1395,6 +1472,7 @@
       homeView.classList.add("hidden");
       detailView.classList.add("hidden");
       linksView.classList.add("hidden");
+      feesView.classList.add("hidden");
       paymentView.classList.remove("hidden");
       renderPaymentList();
     }
@@ -1402,6 +1480,200 @@
     function closePaymentView() {
       isPaymentView = false;
       paymentView.classList.add("hidden");
+      homeView.classList.remove("hidden");
+      renderHome();
+    }
+
+    function getCurrentHalfYearPeriod() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const half = now.getMonth() < 6 ? "H1" : "H2";
+      return year + "-" + half;
+    }
+
+    function formatFeePeriodLabel(periodKey) {
+      const parts = periodKey.split("-");
+      if (parts.length !== 2) return periodKey;
+      return parts[0] + " " + (parts[1] === "H1" ? "上半年" : "下半年");
+    }
+
+    function shiftFeePeriod(periodKey, delta) {
+      const parts = periodKey.split("-");
+      let year = parseInt(parts[0], 10);
+      const half = parts[1];
+      if (isNaN(year)) return getCurrentHalfYearPeriod();
+      if (delta > 0) {
+        return half === "H1" ? year + "-H2" : (year + 1) + "-H1";
+      }
+      return half === "H2" ? year + "-H1" : (year - 1) + "-H2";
+    }
+
+    function loadMembershipFees() {
+      if (!cache.membershipFees || typeof cache.membershipFees !== "object") {
+        cache.membershipFees = {};
+      }
+      return cache.membershipFees;
+    }
+
+    function getMemberFeePaid(periodKey, sectionId, memberName) {
+      const fees = loadMembershipFees();
+      return !!(fees[periodKey] && fees[periodKey][sectionId] && fees[periodKey][sectionId][memberName]);
+    }
+
+    function getSectionFeeAmount(sectionId) {
+      return MEMBERSHIP_FEE_AMOUNTS[sectionId] || 0;
+    }
+
+    function countFeesSummary(periodKey) {
+      let totalMembers = 0;
+      let paidCount = 0;
+      let collected = 0;
+      const data = loadData();
+      SECTIONS.forEach(function (section) {
+        const sec = data[section.id] || { members: [] };
+        const amount = getSectionFeeAmount(section.id);
+        sec.members.forEach(function (member) {
+          totalMembers += 1;
+          if (getMemberFeePaid(periodKey, section.id, member)) {
+            paidCount += 1;
+            collected += amount;
+          }
+        });
+      });
+      return { totalMembers: totalMembers, paidCount: paidCount, collected: collected };
+    }
+
+    async function setMemberFeePaid(periodKey, sectionId, memberName, paid) {
+      const fees = loadMembershipFees();
+      if (!fees[periodKey]) fees[periodKey] = {};
+      if (!fees[periodKey][sectionId]) fees[periodKey][sectionId] = {};
+      if (paid) fees[periodKey][sectionId][memberName] = true;
+      else delete fees[periodKey][sectionId][memberName];
+      cache.membershipFees = fees;
+      await persistAll("更新會費紀錄");
+    }
+
+    function showFeesError(message) {
+      feesErrorText.textContent = message;
+      feesError.classList.remove("hidden");
+    }
+
+    function hideFeesError() {
+      feesErrorText.textContent = "";
+      feesError.classList.add("hidden");
+    }
+
+    function renderFeesView() {
+      if (!currentFeePeriod) currentFeePeriod = getCurrentHalfYearPeriod();
+      feesPeriodLabel.textContent = formatFeePeriodLabel(currentFeePeriod);
+      feesPeriodKey.textContent = currentFeePeriod;
+
+      const summary = countFeesSummary(currentFeePeriod);
+      feesSummary.innerHTML =
+        '<i class="fa-solid fa-chart-pie mr-1 text-amber-600"></i>' +
+        '已繳 <span class="font-semibold text-gray-800">' + summary.paidCount + "</span> / " + summary.totalMembers + " 人" +
+        '　|　已收 <span class="font-semibold text-emerald-700">$' + summary.collected.toLocaleString() + "</span>";
+
+      const data = loadData();
+      feesSections.innerHTML = "";
+
+      SECTIONS.forEach(function (section) {
+        const sec = data[section.id] || { members: [] };
+        const amount = getSectionFeeAmount(section.id);
+        const members = sec.members.slice();
+        let sectionPaid = 0;
+
+        const card = document.createElement("div");
+        card.className = "rounded-xl border border-gray-200 overflow-hidden";
+
+        let rowsHtml = "";
+        if (members.length === 0) {
+          rowsHtml =
+            '<tr><td colspan="3" class="px-4 py-6 text-center text-sm text-gray-400">' +
+            '<i class="fa-solid fa-user-slash mr-1"></i>此支部尚無成員，請先到支部點名表新增</td></tr>';
+        } else {
+          members.forEach(function (member, idx) {
+            const paid = getMemberFeePaid(currentFeePeriod, section.id, member);
+            if (paid) sectionPaid += 1;
+            const rowBg = idx % 2 === 1 ? "bg-gray-50" : "bg-white";
+            const btnClass = paid
+              ? "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200"
+              : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200";
+            const btnLabel = paid
+              ? '<i class="fa-solid fa-circle-check mr-1"></i>已繳'
+              : '<i class="fa-regular fa-circle mr-1"></i>未繳';
+            rowsHtml +=
+              '<tr class="' + rowBg + '">' +
+              '<td class="px-4 py-2.5 text-sm font-medium text-gray-800">' + escapeHtml(member) + "</td>" +
+              '<td class="px-4 py-2.5 text-sm text-gray-600 text-center">$' + amount + "</td>" +
+              '<td class="px-4 py-2.5 text-center">' +
+              '<button type="button" class="fee-toggle-btn inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition ' + btnClass + '" ' +
+              'data-section-id="' + section.id + '" data-member="' + encodeURIComponent(member) + '" data-paid="' + (paid ? "1" : "0") + '">' +
+              btnLabel + "</button></td></tr>";
+          });
+        }
+
+        card.innerHTML =
+          '<div class="flex items-center justify-between gap-3 px-4 py-3 bg-gray-50 border-b border-gray-200">' +
+          '<div class="flex items-center gap-2">' +
+          '<span class="flex items-center justify-center w-8 h-8 rounded-full ' + section.color + ' text-white text-sm">' +
+          '<i class="fa-solid ' + section.icon + '"></i></span>' +
+          '<div><p class="font-bold text-gray-800">' + section.name + '</p>' +
+          '<p class="text-xs text-gray-500">$' + amount + ' / 半年</p></div></div>' +
+          '<p class="text-sm text-gray-600">已繳 <span class="font-semibold">' + sectionPaid + '</span> / ' + members.length + " 人</p></div>" +
+          '<div class="overflow-x-auto"><table class="w-full min-w-[20rem] text-sm border-collapse">' +
+          '<thead><tr class="bg-white border-b border-gray-200">' +
+          '<th class="px-4 py-2 text-left text-xs font-semibold text-gray-500">姓名</th>' +
+          '<th class="px-4 py-2 text-center text-xs font-semibold text-gray-500 w-24">會費</th>' +
+          '<th class="px-4 py-2 text-center text-xs font-semibold text-gray-500 w-28">狀態</th>' +
+          "</tr></thead><tbody>" + rowsHtml + "</tbody></table></div>";
+
+        feesSections.appendChild(card);
+      });
+
+      feesSections.querySelectorAll(".fee-toggle-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          handleFeeToggle(btn);
+        });
+      });
+    }
+
+    async function handleFeeToggle(btn) {
+      if (!currentFeePeriod) return;
+      const sectionId = btn.dataset.sectionId;
+      const memberName = decodeURIComponent(btn.getAttribute("data-member") || "");
+      const currentlyPaid = btn.dataset.paid === "1";
+      btn.disabled = true;
+      hideFeesError();
+      try {
+        await setMemberFeePaid(currentFeePeriod, sectionId, memberName, !currentlyPaid);
+        renderFeesView();
+        renderHome();
+        setSyncStatus("已更新會費紀錄", "success");
+      } catch (err) {
+        showFeesError(err.message);
+        btn.disabled = false;
+      }
+    }
+
+    function openFeesView() {
+      isFeesView = true;
+      isPaymentView = false;
+      isLinksView = false;
+      currentSectionId = null;
+      currentFeePeriod = getCurrentHalfYearPeriod();
+      hideFeesError();
+      homeView.classList.add("hidden");
+      detailView.classList.add("hidden");
+      paymentView.classList.add("hidden");
+      linksView.classList.add("hidden");
+      feesView.classList.remove("hidden");
+      renderFeesView();
+    }
+
+    function closeFeesView() {
+      isFeesView = false;
+      feesView.classList.add("hidden");
       homeView.classList.remove("hidden");
       renderHome();
     }
@@ -1478,12 +1750,14 @@
     function openLinksView() {
       isLinksView = true;
       isPaymentView = false;
+      isFeesView = false;
       currentSectionId = null;
       hideLinksError();
       closeLinkModal();
       homeView.classList.add("hidden");
       detailView.classList.add("hidden");
       paymentView.classList.add("hidden");
+      feesView.classList.add("hidden");
       linksView.classList.remove("hidden");
       renderLinksList();
     }
@@ -1532,10 +1806,13 @@
       sectionGrid.appendChild(linksCard);
 
       homeExtraGrid.innerHTML = "";
-      homeExtraGrid.className = "mt-4 sm:mt-5";
+      homeExtraGrid.className = "mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5";
 
       const pendingCount = getPendingPaymentRequests().length;
       const totalCount = loadPaymentRequests().length;
+      const feeSummary = countFeesSummary(getCurrentHalfYearPeriod());
+      const currentPeriodLabel = formatFeePeriodLabel(getCurrentHalfYearPeriod());
+
       const paymentCard = document.createElement("button");
       paymentCard.type = "button";
       paymentCard.className = "w-full text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-emerald-300 hover:shadow-xl transition group";
@@ -1550,17 +1827,33 @@
         '<p class="mt-4 text-sm font-medium text-emerald-600 group-hover:text-emerald-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入申請表</p>';
       paymentCard.addEventListener("click", openPaymentView);
       homeExtraGrid.appendChild(paymentCard);
+
+      const feesCard = document.createElement("button");
+      feesCard.type = "button";
+      feesCard.className = "w-full text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-amber-300 hover:shadow-xl transition group";
+      feesCard.innerHTML =
+        '<div class="flex items-center gap-3 mb-3">' +
+          '<span class="flex items-center justify-center w-9 h-9 rounded-full bg-amber-500 text-white">' +
+            '<i class="fa-solid fa-coins"></i></span>' +
+          '<h3 class="text-lg sm:text-xl font-bold text-gray-800">會費</h3></div>' +
+        '<p class="text-sm text-gray-500"><i class="fa-solid fa-calendar-check mr-1 text-gray-400"></i>' + currentPeriodLabel + " 會費登記</p>" +
+        '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-user-check mr-1 text-gray-400"></i>已繳：<span class="font-semibold text-gray-700">' + feeSummary.paidCount + "</span> / " + feeSummary.totalMembers + " 人</p>" +
+        '<p class="mt-4 text-sm font-medium text-amber-600 group-hover:text-amber-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入會費表</p>";
+      feesCard.addEventListener("click", openFeesView);
+      homeExtraGrid.appendChild(feesCard);
     }
 
     function openSection(sectionId) {
       isPaymentView = false;
       isLinksView = false;
+      isFeesView = false;
       currentSectionId = sectionId;
       const section = SECTIONS.find(function (s) { return s.id === sectionId; });
       sectionTitle.innerHTML = '<i class="fa-solid ' + section.icon + ' mr-2 text-blue-600"></i>' + section.name;
       homeView.classList.add("hidden");
       paymentView.classList.add("hidden");
       linksView.classList.add("hidden");
+      feesView.classList.add("hidden");
       detailView.classList.remove("hidden");
       hideError();
       newMemberInput.value = "";
@@ -1580,6 +1873,7 @@
     function showCurrentViewAfterReload() {
       if (currentSectionId) renderTable();
       else if (isPaymentView) renderPaymentList();
+      else if (isFeesView) renderFeesView();
       else if (isLinksView) renderLinksList();
       else renderHome();
     }
@@ -1886,6 +2180,15 @@
 
     backBtn.addEventListener("click", closeSection);
     paymentBackBtn.addEventListener("click", closePaymentView);
+    feesBackBtn.addEventListener("click", closeFeesView);
+    feesPeriodPrev.addEventListener("click", function () {
+      currentFeePeriod = shiftFeePeriod(currentFeePeriod || getCurrentHalfYearPeriod(), -1);
+      renderFeesView();
+    });
+    feesPeriodNext.addEventListener("click", function () {
+      currentFeePeriod = shiftFeePeriod(currentFeePeriod || getCurrentHalfYearPeriod(), 1);
+      renderFeesView();
+    });
     paymentExportBtn.addEventListener("click", exportPaymentRequestsToPdf);
     paymentProcessedToggle.addEventListener("click", function () {
       setPaymentProcessedPanelOpen(!paymentProcessedPanelOpen);
