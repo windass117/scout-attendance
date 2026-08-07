@@ -636,9 +636,26 @@
       return cache;
     }
 
+    function getSectionMembers(sectionData) {
+      const members = sectionData && sectionData.members;
+      return Array.isArray(members) ? members : [];
+    }
+
+    function getSectionDates(sectionData) {
+      const dates = sectionData && sectionData.dates;
+      return Array.isArray(dates) ? dates : [];
+    }
+
     async function fetchFromGitHub() {
       const apiUrl = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
-      let res = await fetch(apiUrl, { headers: publicGithubHeaders(), cache: "no-store" });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(function () { controller.abort(); }, 20000);
+      let res;
+      try {
+        res = await fetch(apiUrl, { headers: publicGithubHeaders(), cache: "no-store", signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (res.ok) {
         const file = await res.json();
@@ -1530,9 +1547,11 @@
       let collected = 0;
       const data = loadData();
       SECTIONS.forEach(function (section) {
-        const sec = data[section.id] || { members: [] };
+        const sec = data[section.id] || { members: [], dates: [], attendance: {} };
+        const members = getSectionMembers(sec);
+        const dates = getSectionDates(sec);
         const amount = getSectionFeeAmount(section.id);
-        sec.members.forEach(function (member) {
+        members.forEach(function (member) {
           totalMembers += 1;
           if (getMemberFeePaid(periodKey, section.id, member)) {
             paidCount += 1;
@@ -1578,9 +1597,9 @@
       feesSections.innerHTML = "";
 
       SECTIONS.forEach(function (section) {
-        const sec = data[section.id] || { members: [] };
+        const sec = data[section.id] || { members: [], dates: [], attendance: {} };
         const amount = getSectionFeeAmount(section.id);
-        const members = sec.members.slice();
+        const members = getSectionMembers(sec).slice();
         let sectionPaid = 0;
 
         const card = document.createElement("div");
@@ -1771,10 +1790,13 @@
     }
 
     function renderHome() {
+      try {
       sectionGrid.innerHTML = "";
       const data = loadData();
       SECTIONS.forEach(function (section) {
         const sec = data[section.id] || { members: [], dates: [], attendance: {} };
+        const members = getSectionMembers(sec);
+        const dates = getSectionDates(sec);
         const card = document.createElement("button");
         card.type = "button";
         card.className = "text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition group";
@@ -1783,8 +1805,8 @@
             '<span class="flex items-center justify-center w-9 h-9 rounded-full ' + section.color + ' text-white">' +
               '<i class="fa-solid ' + section.icon + '"></i></span>' +
             '<h3 class="text-lg sm:text-xl font-bold text-gray-800">' + section.name + "</h3></div>" +
-          '<p class="text-sm text-gray-500"><i class="fa-solid fa-users mr-1 text-gray-400"></i>成員：<span class="font-semibold text-gray-700">' + sec.members.length + "</span> 人</p>" +
-          '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-calendar-days mr-1 text-gray-400"></i>集會：<span class="font-semibold text-gray-700">' + sec.dates.length + "</span> 次</p>" +
+          '<p class="text-sm text-gray-500"><i class="fa-solid fa-users mr-1 text-gray-400"></i>成員：<span class="font-semibold text-gray-700">' + members.length + "</span> 人</p>" +
+          '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-calendar-days mr-1 text-gray-400"></i>集會：<span class="font-semibold text-gray-700">' + dates.length + "</span> 次</p>" +
           '<p class="mt-4 text-sm font-medium text-blue-600 group-hover:text-blue-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入點名表</p>';
         card.addEventListener("click", function () { openSection(section.id); });
         sectionGrid.appendChild(card);
@@ -1841,6 +1863,13 @@
         '<p class="mt-4 text-sm font-medium text-amber-600 group-hover:text-amber-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入會費表</p>';
       feesCard.addEventListener("click", openFeesView);
       homeExtraGrid.appendChild(feesCard);
+      } catch (err) {
+        console.error("renderHome failed:", err);
+        sectionGrid.innerHTML =
+          '<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">' +
+          '<p class="font-semibold mb-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>主畫面載入失敗</p>' +
+          '<p>請按 Ctrl+Shift+R 強制重新整理。若仍失敗，請檢查網路連線。</p></div>';
+      }
     }
 
     function openSection(sectionId) {
@@ -2065,6 +2094,7 @@
 
     async function initApp() {
       toolbarRepo.textContent = GITHUB_CONFIG.owner + "/" + GITHUB_CONFIG.repo + " (" + GITHUB_CONFIG.branch + ")";
+      renderHome();
       try {
         setSyncStatus("載入中…", "info");
         await validateAndClearBadToken();
@@ -2072,7 +2102,10 @@
         renderHome();
         setSyncStatus("已載入 GitHub 資料" + syncStatusSummary(), "success");
       } catch (err) {
-        setSyncStatus("載入失敗", "error");
+        const msg = err && err.name === "AbortError"
+          ? "載入逾時，請檢查網路後按「重新載入」"
+          : (err.message || "載入失敗");
+        setSyncStatus(msg, "error");
         renderHome();
         console.error(err);
       }
