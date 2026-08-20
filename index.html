@@ -464,6 +464,7 @@
     let currentFeePeriod = null;
     let githubSha = null;
     let isSyncing = false;
+    let dataLoaded = false;
     let cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
     let pendingReceiptDataUrl = null;
 
@@ -625,6 +626,10 @@
       return btoa(binary);
     }
 
+    function emptyCache() {
+      return { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
+    }
+
     function applyParsedData(parsed) {
       cache = {
         attendance: parsed.attendance || {},
@@ -633,6 +638,7 @@
         usefulLinks: Array.isArray(parsed.usefulLinks) ? parsed.usefulLinks : [],
         membershipFees: parsed.membershipFees && typeof parsed.membershipFees === "object" ? parsed.membershipFees : {},
       };
+      dataLoaded = true;
       return cache;
     }
 
@@ -646,7 +652,74 @@
       return Array.isArray(dates) ? dates : [];
     }
 
+    function isDataUrl(value) {
+      return typeof value === "string" && value.indexOf("data:") === 0;
+    }
+
+    function getReceiptDisplayUrl(receiptImage) {
+      if (!receiptImage) return "";
+      if (isDataUrl(receiptImage) || /^https?:\/\//i.test(receiptImage)) return receiptImage;
+      const path = String(receiptImage).replace(/^\//, "");
+      return "https://raw.githubusercontent.com/" + GITHUB_CONFIG.owner + "/" +
+        GITHUB_CONFIG.repo + "/" + GITHUB_CONFIG.branch + "/" + path;
+    }
+
+    function getContentsApiUrlForPath(path) {
+      return "https://api.github.com/repos/" + GITHUB_CONFIG.owner + "/" +
+        GITHUB_CONFIG.repo + "/contents/" + path;
+    }
+
+    async function fetchFileSha(path) {
+      if (!getActiveToken()) return null;
+      const url = getContentsApiUrlForPath(path) + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
+      const res = await fetch(url, { headers: githubHeaders() });
+      if (!res.ok) return null;
+      const file = await res.json();
+      return file.sha || null;
+    }
+
+    async function uploadBinaryToGitHub(path, base64Content, message) {
+      if (!getActiveToken()) {
+        throw new Error("尚未設定 GitHub Token，無法儲存收據圖片。");
+      }
+      const payload = {
+        message: message || ("更新 " + path),
+        content: base64Content,
+        branch: GITHUB_CONFIG.branch,
+      };
+      const existingSha = await fetchFileSha(path);
+      if (existingSha) payload.sha = existingSha;
+
+      const res = await fetch(getContentsApiUrlForPath(path), {
+        method: "PUT",
+        headers: Object.assign({ "Content-Type": "application/json" }, githubHeaders()),
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(function () { return {}; });
+        throw new Error(err.message || ("無法上傳收據（" + res.status + "）"));
+      }
+    }
+
+    async function externalizeEmbeddedReceipts() {
+      const requests = Array.isArray(cache.paymentRequests) ? cache.paymentRequests : [];
+      let changed = false;
+      for (let i = 0; i < requests.length; i++) {
+        const req = requests[i];
+        if (!req || !isDataUrl(req.receiptImage)) continue;
+        const comma = req.receiptImage.indexOf(",");
+        if (comma < 0) continue;
+        const base64 = req.receiptImage.slice(comma + 1);
+        const path = "data/receipts/" + req.id + ".jpg";
+        await uploadBinaryToGitHub(path, base64, "新增收據圖片 " + req.id);
+        req.receiptImage = path;
+        changed = true;
+      }
+      return changed;
+    }
+
     async function fetchFromGitHub() {
+      dataLoaded = false;
       const apiUrl = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
       const controller = new AbortController();
       const timeoutId = setTimeout(function () { controller.abort(); }, 20000);
@@ -660,24 +733,28 @@
       if (res.ok) {
         const file = await res.json();
         githubSha = file.sha;
-        return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
-      }
-
-      if (res.status === 404) {
-        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
+        // GitHub Contents API omits file body when size > 1MB (encoding: "none", empty content).
+        if (file.encoding === "base64" && file.content) {
+          return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
+        }
+        // Keep sha from metadata, then load body via raw URL below.
+      } else if (res.status === 404) {
+        cache = emptyCache();
         githubSha = null;
+        dataLoaded = true;
         return cache;
       }
 
       res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
       if (res.status === 404) {
-        cache = { attendance: {}, history: [], paymentRequests: [], usefulLinks: [], membershipFees: {} };
+        cache = emptyCache();
         githubSha = null;
+        dataLoaded = true;
         return cache;
       }
       if (!res.ok) throw new Error("無法讀取 GitHub 資料（" + res.status + "）");
       applyParsedData(await res.json());
-      await refreshSha();
+      if (!githubSha) await refreshSha();
       return cache;
     }
 
@@ -712,19 +789,24 @@
       if (!getActiveToken()) {
         throw new Error("尚未設定 GitHub Token，無法儲存。請按頂部「設定 Token」");
       }
+      if (!dataLoaded) {
+        throw new Error("資料尚未載入完成，請先按「重新載入」再儲存，以免覆蓋現有資料");
+      }
       if (!githubSha) await refreshSha();
 
       isSyncing = true;
       setSyncStatus("同步中…", "info");
 
-      const payload = {
-        message: message || "更新童軍點名資料",
-        content: encodeBase64Utf8(JSON.stringify(cache, null, 2)),
-        branch: GITHUB_CONFIG.branch,
-      };
-      if (githubSha) payload.sha = githubSha;
-
       try {
+        await externalizeEmbeddedReceipts();
+
+        const payload = {
+          message: message || "更新童軍點名資料",
+          content: encodeBase64Utf8(JSON.stringify(cache, null, 2)),
+          branch: GITHUB_CONFIG.branch,
+        };
+        if (githubSha) payload.sha = githubSha;
+
         const res = await fetch(getContentsApiUrl(), {
           method: "PUT",
           headers: Object.assign({ "Content-Type": "application/json" }, githubHeaders()),
@@ -989,7 +1071,7 @@
       }
 
       if (item.receiptImage) {
-        html += '<a href="' + item.receiptImage + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">' +
+        html += '<a href="' + getReceiptDisplayUrl(item.receiptImage) + '" target="_blank" rel="noopener" class="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">' +
           '<i class="fa-solid fa-image mr-1"></i>查看收據</a>';
       }
       if (waUrl) {
@@ -1394,13 +1476,13 @@
             canvas.width = w;
             canvas.height = h;
             canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-            let quality = 0.75;
+            let quality = 0.7;
             let dataUrl = canvas.toDataURL("image/jpeg", quality);
-            while (dataUrl.length > 700000 && quality > 0.3) {
+            while (dataUrl.length > 350000 && quality > 0.35) {
               quality -= 0.1;
               dataUrl = canvas.toDataURL("image/jpeg", quality);
             }
-            if (dataUrl.length > 900000) {
+            if (dataUrl.length > 500000) {
               reject(new Error("收據圖片壓縮後仍過大，請改用較小的圖片。"));
               return;
             }
