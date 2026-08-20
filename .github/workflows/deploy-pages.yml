@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - "data/attendance.json"
+      - "data/receipts/**"
   workflow_dispatch:
 
 permissions:
