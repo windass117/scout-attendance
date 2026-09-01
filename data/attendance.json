@@ -2272,8 +2272,8 @@
       "amount": 243.05,
       "chequePayee": "HO PO SHAN",
       "receiptImage": "data/receipts/1786929043100.jpg",
-      "processed": false,
-      "processedAt": null
+      "processed": true,
+      "processedAt": "2026-09-01T06:34:05.741Z"
     }
   ],
   "usefulLinks": [
