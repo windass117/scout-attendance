@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>1833領袖專區</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -44,6 +47,7 @@
           <i class="fa-solid fa-hand-pointer mr-1"></i>請選擇功能或支部
         </p>
       </header>
+      <div id="home-load-banner" class="hidden mb-4 rounded-xl border px-4 py-3 text-sm" role="status"></div>
       <div id="section-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5"></div>
       <div id="home-extra-grid" class="mt-4 sm:mt-5"></div>
     </main>
@@ -476,6 +480,7 @@
     const homeView = document.getElementById("home-view");
     const detailView = document.getElementById("detail-view");
     const sectionGrid = document.getElementById("section-grid");
+    const homeLoadBanner = document.getElementById("home-load-banner");
     const homeExtraGrid = document.getElementById("home-extra-grid");
     const paymentView = document.getElementById("payment-view");
     const linksView = document.getElementById("links-view");
@@ -720,42 +725,75 @@
 
     async function fetchFromGitHub() {
       dataLoaded = false;
+
+      // Prefer raw URL for the JSON body: works for files of any size and avoids
+      // Contents API omitting bodies over 1MB. Fetch SHA metadata in parallel.
       const apiUrl = getContentsApiUrl() + "?ref=" + encodeURIComponent(GITHUB_CONFIG.branch);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(function () { controller.abort(); }, 20000);
-      let res;
+      const metaController = new AbortController();
+      const metaTimeoutId = setTimeout(function () { metaController.abort(); }, 20000);
+      const metaPromise = fetch(apiUrl, {
+        headers: githubHeaders(),
+        cache: "no-store",
+        signal: metaController.signal,
+      }).then(function (res) {
+        return res.ok ? res.json() : null;
+      }).catch(function () {
+        return null;
+      }).finally(function () {
+        clearTimeout(metaTimeoutId);
+      });
+
+      const rawController = new AbortController();
+      const rawTimeoutId = setTimeout(function () { rawController.abort(); }, 20000);
+      let rawRes;
       try {
-        res = await fetch(apiUrl, { headers: publicGithubHeaders(), cache: "no-store", signal: controller.signal });
+        rawRes = await fetch(getRawUrl() + "?t=" + Date.now(), {
+          cache: "no-store",
+          signal: rawController.signal,
+        });
       } finally {
-        clearTimeout(timeoutId);
+        clearTimeout(rawTimeoutId);
       }
 
-      if (res.ok) {
-        const file = await res.json();
-        githubSha = file.sha;
-        // GitHub Contents API omits file body when size > 1MB (encoding: "none", empty content).
-        if (file.encoding === "base64" && file.content) {
-          return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
-        }
-        // Keep sha from metadata, then load body via raw URL below.
-      } else if (res.status === 404) {
+      if (rawRes.ok) {
+        applyParsedData(await rawRes.json());
+        const file = await metaPromise;
+        if (file && file.sha) githubSha = file.sha;
+        else if (!githubSha) await refreshSha();
+        return cache;
+      }
+
+      if (rawRes.status === 404) {
         cache = emptyCache();
         githubSha = null;
         dataLoaded = true;
         return cache;
       }
 
-      res = await fetch(getRawUrl() + "?t=" + Date.now(), { cache: "no-store" });
-      if (res.status === 404) {
-        cache = emptyCache();
-        githubSha = null;
-        dataLoaded = true;
-        return cache;
+      // Raw failed: fall back to Contents API body when available.
+      const file = await metaPromise;
+      if (file && file.sha) githubSha = file.sha;
+      if (file && file.encoding === "base64" && file.content) {
+        return applyParsedData(JSON.parse(decodeBase64Utf8(file.content)));
       }
-      if (!res.ok) throw new Error("無法讀取 GitHub 資料（" + res.status + "）");
-      applyParsedData(await res.json());
-      if (!githubSha) await refreshSha();
-      return cache;
+
+      throw new Error("無法讀取 GitHub 資料（" + rawRes.status + "）。請按「重新載入」或稍後再試");
+    }
+
+    function setHomeLoadBanner(message, type) {
+      if (!homeLoadBanner) return;
+      if (!message) {
+        homeLoadBanner.className = "hidden mb-4 rounded-xl border px-4 py-3 text-sm";
+        homeLoadBanner.textContent = "";
+        return;
+      }
+      const styles = type === "error"
+        ? "border-red-200 bg-red-50 text-red-800"
+        : type === "success"
+          ? "border-green-200 bg-green-50 text-green-800"
+          : "border-blue-200 bg-blue-50 text-blue-800";
+      homeLoadBanner.className = "mb-4 rounded-xl border px-4 py-3 text-sm " + styles;
+      homeLoadBanner.innerHTML = message;
     }
 
     async function testToken(token) {
@@ -1873,6 +1911,15 @@
 
     function renderHome() {
       try {
+      if (!dataLoaded) {
+        setHomeLoadBanner(
+          '<p class="font-semibold mb-1"><i class="fa-solid fa-circle-info mr-1"></i>資料載入中或尚未載入</p>' +
+          '<p>若成員數一直顯示 0，請按右上角「重新載入」。仍不行請強制重新整理頁面（手機可清除此網站快取）。</p>',
+          "info"
+        );
+      } else {
+        setHomeLoadBanner("", null);
+      }
       sectionGrid.innerHTML = "";
       const data = loadData();
       SECTIONS.forEach(function (section) {
@@ -1947,10 +1994,12 @@
       homeExtraGrid.appendChild(feesCard);
       } catch (err) {
         console.error("renderHome failed:", err);
-        sectionGrid.innerHTML =
-          '<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">' +
+        setHomeLoadBanner(
           '<p class="font-semibold mb-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>主畫面載入失敗</p>' +
-          '<p>請按 Ctrl+Shift+R 強制重新整理。若仍失敗，請檢查網路連線。</p></div>';
+          '<p>請強制重新整理頁面。若仍失敗，請檢查網路連線後按「重新載入」。</p>',
+          "error"
+        );
+        sectionGrid.innerHTML = "";
       }
     }
 
@@ -2188,7 +2237,12 @@
           ? "載入逾時，請檢查網路後按「重新載入」"
           : (err.message || "載入失敗");
         setSyncStatus(msg, "error");
-        renderHome();
+        setHomeLoadBanner(
+          '<p class="font-semibold mb-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>無法載入已儲存資料</p>' +
+          '<p>' + escapeHtml(msg) + '</p>' +
+          '<p class="mt-1">資料仍在 GitHub，並未消失。請按右上角「重新載入」，或強制重新整理此頁。</p>',
+          "error"
+        );
         console.error(err);
       }
     }
