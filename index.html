@@ -81,6 +81,10 @@
                 <i class="fa-solid fa-plus mr-1"></i>新增
               </button>
             </div>
+            <button id="withdraw-member-btn" type="button"
+              class="mt-3 w-full rounded-lg border border-orange-300 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 transition">
+              <i class="fa-solid fa-user-minus mr-1"></i>退團
+            </button>
           </div>
           <div class="rounded-xl border border-gray-200 p-4 bg-gray-50">
             <p class="text-sm font-medium text-gray-700 mb-2">
@@ -392,6 +396,32 @@
     </div>
   </div>
 
+  <!-- 退團成員小視窗 -->
+  <div id="withdraw-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div id="withdraw-modal-backdrop" class="absolute inset-0 bg-black/40"></div>
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl p-5 sm:p-6">
+      <h3 class="text-lg font-bold text-gray-800 mb-2">
+        <i class="fa-solid fa-user-minus mr-1 text-orange-600"></i>選擇退團成員
+      </h3>
+      <p class="text-sm text-gray-500 mb-4">
+        退團後仍保留歷史點名紀錄，但會移至名單最下方，並從在團人數中扣除。
+      </p>
+      <div id="withdraw-member-list" class="max-h-64 overflow-y-auto space-y-2 mb-2"></div>
+      <p id="withdraw-modal-empty" class="hidden text-sm text-gray-400 py-4 text-center">目前沒有可退團的在團成員。</p>
+      <p id="withdraw-modal-error" class="text-sm text-red-600 hidden"></p>
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="withdraw-modal-cancel" type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          取消
+        </button>
+        <button id="withdraw-modal-confirm" type="button"
+          class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 transition">
+          確認退團
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 新增連結小視窗 -->
   <div id="link-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div id="link-modal-backdrop" class="absolute inset-0 bg-black/40"></div>
@@ -548,6 +578,14 @@
     const feesError = document.getElementById("fees-error");
     const feesErrorText = document.getElementById("fees-error-text");
     const feesSections = document.getElementById("fees-sections");
+    const withdrawMemberBtn = document.getElementById("withdraw-member-btn");
+    const withdrawModal = document.getElementById("withdraw-modal");
+    const withdrawModalBackdrop = document.getElementById("withdraw-modal-backdrop");
+    const withdrawMemberList = document.getElementById("withdraw-member-list");
+    const withdrawModalEmpty = document.getElementById("withdraw-modal-empty");
+    const withdrawModalError = document.getElementById("withdraw-modal-error");
+    const withdrawModalCancel = document.getElementById("withdraw-modal-cancel");
+    const withdrawModalConfirm = document.getElementById("withdraw-modal-confirm");
 
     function getActiveToken() {
       if (GITHUB_CONFIG.defaultToken) return GITHUB_CONFIG.defaultToken;
@@ -650,6 +688,51 @@
     function getSectionDates(sectionData) {
       const dates = sectionData && sectionData.dates;
       return Array.isArray(dates) ? dates : [];
+    }
+
+    function ensureWithdrawnMembers(sectionData) {
+      if (!sectionData) return [];
+      if (!Array.isArray(sectionData.withdrawnMembers)) sectionData.withdrawnMembers = [];
+      const memberSet = {};
+      getSectionMembers(sectionData).forEach(function (name) { memberSet[name] = true; });
+      sectionData.withdrawnMembers = sectionData.withdrawnMembers.filter(function (name) {
+        return !!memberSet[name];
+      });
+      return sectionData.withdrawnMembers;
+    }
+
+    function isWithdrawnMember(sectionData, memberName) {
+      return ensureWithdrawnMembers(sectionData).indexOf(memberName) !== -1;
+    }
+
+    function getActiveMembers(sectionData) {
+      const withdrawn = {};
+      ensureWithdrawnMembers(sectionData).forEach(function (name) { withdrawn[name] = true; });
+      return getSectionMembers(sectionData).filter(function (name) { return !withdrawn[name]; });
+    }
+
+    function reorderMembersByWithdrawn(sectionData) {
+      const withdrawn = {};
+      ensureWithdrawnMembers(sectionData).forEach(function (name) { withdrawn[name] = true; });
+      const active = [];
+      const inactive = [];
+      getSectionMembers(sectionData).forEach(function (name) {
+        if (withdrawn[name]) inactive.push(name);
+        else active.push(name);
+      });
+      sectionData.members = active.concat(inactive);
+      return sectionData.members;
+    }
+
+    function insertActiveMember(sectionData, memberName) {
+      ensureWithdrawnMembers(sectionData);
+      const members = getSectionMembers(sectionData).slice();
+      const withdrawn = {};
+      sectionData.withdrawnMembers.forEach(function (name) { withdrawn[name] = true; });
+      const active = members.filter(function (name) { return !withdrawn[name]; });
+      const inactive = members.filter(function (name) { return withdrawn[name]; });
+      active.push(memberName);
+      sectionData.members = active.concat(inactive);
     }
 
     function isDataUrl(value) {
@@ -872,8 +955,9 @@
     function getSectionData(sectionId) {
       const data = loadData();
       if (!data[sectionId]) {
-        data[sectionId] = { members: [], dates: [], attendance: {} };
+        data[sectionId] = { members: [], dates: [], attendance: {}, withdrawnMembers: [] };
       }
+      ensureWithdrawnMembers(data[sectionId]);
       return data[sectionId];
     }
 
@@ -1630,8 +1714,7 @@
       const data = loadData();
       SECTIONS.forEach(function (section) {
         const sec = data[section.id] || { members: [], dates: [], attendance: {} };
-        const members = getSectionMembers(sec);
-        const dates = getSectionDates(sec);
+        const members = getActiveMembers(sec);
         const amount = getSectionFeeAmount(section.id);
         members.forEach(function (member) {
           totalMembers += 1;
@@ -1681,7 +1764,7 @@
       SECTIONS.forEach(function (section) {
         const sec = data[section.id] || { members: [], dates: [], attendance: {} };
         const amount = getSectionFeeAmount(section.id);
-        const members = getSectionMembers(sec).slice();
+        const members = getActiveMembers(sec).slice();
         let sectionPaid = 0;
 
         const card = document.createElement("div");
@@ -1815,6 +1898,77 @@
       }
     }
 
+
+    function openWithdrawModal() {
+      if (!currentSectionId) return;
+      const section = getSectionData(currentSectionId);
+      const activeMembers = getActiveMembers(section);
+      withdrawMemberList.innerHTML = "";
+      withdrawModalError.classList.add("hidden");
+      withdrawModalError.textContent = "";
+      withdrawModalEmpty.classList.toggle("hidden", activeMembers.length > 0);
+      withdrawModalConfirm.disabled = activeMembers.length === 0;
+
+      activeMembers.forEach(function (name) {
+        const label = document.createElement("label");
+        label.className = "flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:border-orange-300 cursor-pointer";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "withdraw-member-cb rounded border-gray-300 text-orange-600 focus:ring-orange-500";
+        checkbox.value = name;
+        const span = document.createElement("span");
+        span.textContent = name;
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        withdrawMemberList.appendChild(label);
+      });
+
+      withdrawModal.classList.remove("hidden");
+    }
+
+    function closeWithdrawModal() {
+      withdrawModal.classList.add("hidden");
+      withdrawMemberList.innerHTML = "";
+      withdrawModalError.classList.add("hidden");
+      withdrawModalError.textContent = "";
+    }
+
+    async function confirmWithdrawMembers() {
+      if (!currentSectionId) return;
+      const selected = [];
+      withdrawMemberList.querySelectorAll(".withdraw-member-cb:checked").forEach(function (cb) {
+        selected.push(cb.value);
+      });
+      if (selected.length === 0) {
+        withdrawModalError.textContent = "請至少選擇一位成員。";
+        withdrawModalError.classList.remove("hidden");
+        return;
+      }
+      if (!confirm("確定將已選的 " + selected.length + " 位成員標記為退團，並移至名單最下方？")) return;
+
+      withdrawModalConfirm.disabled = true;
+      try {
+        const section = getSectionData(currentSectionId);
+        ensureWithdrawnMembers(section);
+        selected.forEach(function (name) {
+          if (section.members.indexOf(name) === -1) return;
+          if (section.withdrawnMembers.indexOf(name) === -1) {
+            section.withdrawnMembers.push(name);
+          }
+        });
+        reorderMembersByWithdrawn(section);
+        await updateSectionData(currentSectionId, section);
+        closeWithdrawModal();
+        renderTable();
+        setSyncStatus("已更新退團名單", "success");
+      } catch (err) {
+        withdrawModalError.textContent = err.message || "退團失敗";
+        withdrawModalError.classList.remove("hidden");
+      } finally {
+        withdrawModalConfirm.disabled = false;
+      }
+    }
+
     function openLinkModal() {
       linkUrlInput.value = "";
       linkDescInput.value = "";
@@ -1877,8 +2031,9 @@
       const data = loadData();
       SECTIONS.forEach(function (section) {
         const sec = data[section.id] || { members: [], dates: [], attendance: {} };
-        const members = getSectionMembers(sec);
+        const members = getActiveMembers(sec);
         const dates = getSectionDates(sec);
+        const withdrawnCount = ensureWithdrawnMembers(sec).length;
         const card = document.createElement("button");
         card.type = "button";
         card.className = "text-left bg-white rounded-2xl shadow-lg p-5 sm:p-6 border-2 border-transparent hover:border-blue-300 hover:shadow-xl transition group";
@@ -1887,7 +2042,8 @@
             '<span class="flex items-center justify-center w-9 h-9 rounded-full ' + section.color + ' text-white">' +
               '<i class="fa-solid ' + section.icon + '"></i></span>' +
             '<h3 class="text-lg sm:text-xl font-bold text-gray-800">' + section.name + "</h3></div>" +
-          '<p class="text-sm text-gray-500"><i class="fa-solid fa-users mr-1 text-gray-400"></i>成員：<span class="font-semibold text-gray-700">' + members.length + "</span> 人</p>" +
+          '<p class="text-sm text-gray-500"><i class="fa-solid fa-users mr-1 text-gray-400"></i>在團：<span class="font-semibold text-gray-700">' + members.length + "</span> 人" +
+            (withdrawnCount > 0 ? ' <span class="text-gray-400">（退團 ' + withdrawnCount + "）</span>" : "") + "</p>" +
           '<p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-calendar-days mr-1 text-gray-400"></i>集會：<span class="font-semibold text-gray-700">' + dates.length + "</span> 次</p>" +
           '<p class="mt-4 text-sm font-medium text-blue-600 group-hover:text-blue-700"><i class="fa-solid fa-arrow-right mr-1"></i>進入點名表</p>';
         card.addEventListener("click", function () { openSection(section.id); });
@@ -2038,10 +2194,20 @@
       }
 
       let bodyHtml = "";
+      reorderMembersByWithdrawn(section);
       section.members.forEach(function (member) {
         if (!section.attendance[member]) section.attendance[member] = {};
-        bodyHtml += '<tr class="hover:bg-blue-50/40 transition">';
-        bodyHtml += '<td class="sticky left-0 z-10 bg-white border border-gray-300 px-4 py-2 font-medium text-gray-800 whitespace-nowrap"><i class="fa-solid fa-user text-gray-400 mr-1.5"></i>' + member + "</td>";
+        const withdrawn = isWithdrawnMember(section, member);
+        bodyHtml += '<tr class="transition ' + (withdrawn ? "bg-gray-50 text-gray-500" : "hover:bg-blue-50/40") + '">';
+        bodyHtml +=
+          '<td class="sticky left-0 z-10 border border-gray-300 px-4 py-2 font-medium whitespace-nowrap ' +
+            (withdrawn ? "bg-gray-50 text-gray-500" : "bg-white text-gray-800") + '">' +
+            '<i class="fa-solid fa-user ' + (withdrawn ? "text-gray-300" : "text-gray-400") + ' mr-1.5"></i>' +
+            member +
+            (withdrawn
+              ? ' <span class="ml-1 inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">退團</span>'
+              : "") +
+          "</td>";
 
         displayDates.forEach(function (date) {
           const raw = section.attendance[member][date];
@@ -2060,7 +2226,15 @@
         const level = stats.level;
         bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold text-blue-700 bg-blue-50/50">' + rate.toFixed(1) + "%</td>";
         bodyHtml += '<td class="border border-gray-300 px-3 py-2 text-center font-semibold bg-blue-50/50 ' + level.className + '">' + level.text + "</td>";
-        bodyHtml += '<td class="border border-gray-300 px-2 py-2 text-center bg-gray-50"><button type="button" data-remove-member="' + encodeURIComponent(member) + '" class="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition"><i class="fa-solid fa-trash-can mr-0.5"></i>刪除</button></td></tr>';
+        bodyHtml += '<td class="border border-gray-300 px-2 py-2 text-center bg-gray-50 space-y-1">';
+        if (withdrawn) {
+          bodyHtml +=
+            '<button type="button" data-restore-member="' + encodeURIComponent(member) + '" class="block w-full text-xs text-emerald-600 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-50 transition">' +
+              '<i class="fa-solid fa-rotate-left mr-0.5"></i>恢復</button>';
+        }
+        bodyHtml +=
+          '<button type="button" data-remove-member="' + encodeURIComponent(member) + '" class="block w-full text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition">' +
+            '<i class="fa-solid fa-trash-can mr-0.5"></i>刪除</button></td></tr>';
       });
 
       tableBody.innerHTML = bodyHtml;
@@ -2095,6 +2269,25 @@
             const section = getSectionData(currentSectionId);
             section.members = section.members.filter(function (m) { return m !== member; });
             delete section.attendance[member];
+            ensureWithdrawnMembers(section);
+            await updateSectionData(currentSectionId, section);
+            renderTable();
+          } catch (err) {
+            showError(err.message);
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-restore-member]").forEach(function (btn) {
+        btn.addEventListener("click", async function () {
+          const member = decodeURIComponent(btn.dataset.restoreMember);
+          if (!confirm("確定要將「" + member + "」恢復為在團成員嗎？")) return;
+          try {
+            const section = getSectionData(currentSectionId);
+            section.withdrawnMembers = ensureWithdrawnMembers(section).filter(function (m) {
+              return m !== member;
+            });
+            reorderMembersByWithdrawn(section);
             await updateSectionData(currentSectionId, section);
             renderTable();
           } catch (err) {
@@ -2248,8 +2441,12 @@
       const section = getSectionData(currentSectionId);
       if (section.members.includes(name)) { showError("「" + name + "」已登記。"); return; }
       try {
-        section.members.push(name);
+        insertActiveMember(section, name);
         section.attendance[name] = {};
+        // If previously marked withdrawn somehow, clear it.
+        section.withdrawnMembers = ensureWithdrawnMembers(section).filter(function (m) {
+          return m !== name;
+        });
         await updateSectionData(currentSectionId, section);
         newMemberInput.value = "";
         renderTable();
@@ -2271,7 +2468,11 @@
         section.dates.sort(function (a, b) { return b.localeCompare(a); });
         section.members.forEach(function (member) {
           if (!section.attendance[member]) section.attendance[member] = {};
-          if (section.attendance[member][date] === undefined) section.attendance[member][date] = ATTENDANCE.ABSENT;
+          if (section.attendance[member][date] === undefined) {
+            section.attendance[member][date] = isWithdrawnMember(section, member)
+              ? ATTENDANCE.NA
+              : ATTENDANCE.ABSENT;
+          }
         });
         await updateSectionData(currentSectionId, section);
         renderTable();
@@ -2311,6 +2512,12 @@
     paymentProcessedFilter.addEventListener("change", renderProcessedPaymentList);
 
     linksBackBtn.addEventListener("click", closeLinksView);
+
+    withdrawMemberBtn.addEventListener("click", openWithdrawModal);
+    withdrawModalCancel.addEventListener("click", closeWithdrawModal);
+    withdrawModalBackdrop.addEventListener("click", closeWithdrawModal);
+    withdrawModalConfirm.addEventListener("click", confirmWithdrawMembers);
+
     linkAddBtn.addEventListener("click", openLinkModal);
     linkModalCancel.addEventListener("click", closeLinkModal);
     linkModalBackdrop.addEventListener("click", closeLinkModal);
