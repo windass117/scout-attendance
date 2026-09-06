@@ -3,7 +3,8 @@
     "rover": {
       "members": [],
       "dates": [],
-      "attendance": {}
+      "attendance": {},
+      "withdrawnMembers": []
     },
     "cub": {
       "members": [
@@ -23,13 +24,13 @@
         "黃日齊",
         "鄺子臻",
         "莊海琳",
-        "吳梓謙",
-        "袁一藍",
         "陳彥希",
         "黃昱然",
         "高灝舜",
         "葉楚航",
-        "潘綽弘"
+        "潘綽弘",
+        "吳梓謙",
+        "袁一藍"
       ],
       "dates": [
         "2026-09-05",
@@ -579,12 +580,17 @@
           "2026-07-11": "na",
           "2026-07-18": "present"
         }
-      }
+      },
+      "withdrawnMembers": [
+        "吳梓謙",
+        "袁一藍"
+      ]
     },
     "grasshopper": {
       "members": [],
       "dates": [],
-      "attendance": {}
+      "attendance": {},
+      "withdrawnMembers": []
     }
   },
   "history": [
