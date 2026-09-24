@@ -2387,8 +2387,8 @@
       "amount": 355,
       "chequePayee": "Nil",
       "receiptImage": "data/receipts/1790249529403.jpg",
-      "processed": false,
-      "processedAt": null
+      "processed": true,
+      "processedAt": "2026-09-24T11:42:24.884Z"
     }
   ],
   "usefulLinks": [
