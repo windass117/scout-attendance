@@ -2375,6 +2375,20 @@
       "receiptImage": "data/receipts/1786929043100.jpg",
       "processed": true,
       "processedAt": "2026-09-01T06:34:05.741Z"
+    },
+    {
+      "id": 1790249529403,
+      "submittedAt": "2026-09-24T11:32:09.403Z",
+      "applicantName": "謝梓晞",
+      "phone": "51350077",
+      "sectionId": "grasshopper",
+      "sectionName": "小童軍",
+      "purpose": "購買物資",
+      "amount": 355,
+      "chequePayee": "Nil",
+      "receiptImage": "data/receipts/1790249529403.jpg",
+      "processed": false,
+      "processedAt": null
     }
   ],
   "usefulLinks": [
