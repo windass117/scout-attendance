@@ -2389,6 +2389,20 @@
       "receiptImage": "data/receipts/1790249529403.jpg",
       "processed": true,
       "processedAt": "2026-09-24T11:42:24.884Z"
+    },
+    {
+      "id": 1790918431568,
+      "submittedAt": "2026-10-02T05:20:31.568Z",
+      "applicantName": "Lam Siu Lung",
+      "phone": "62717207",
+      "sectionId": "cub",
+      "sectionName": "幼童軍",
+      "purpose": "團呼比賽",
+      "amount": 150,
+      "chequePayee": "Lam Siu Lung",
+      "receiptImage": "data/receipts/1790918431568.jpg",
+      "processed": false,
+      "processedAt": null
     }
   ],
   "usefulLinks": [
