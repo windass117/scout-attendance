@@ -2371,8 +2371,8 @@
       "amount": 70,
       "chequePayee": "Lam Siu Lung",
       "receiptImage": "data/receipts/1786594002601.jpg",
-      "processed": false,
-      "processedAt": null
+      "processed": true,
+      "processedAt": "2026-10-05T13:23:06.650Z"
     },
     {
       "id": 1786928932542,
