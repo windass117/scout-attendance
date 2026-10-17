@@ -2455,6 +2455,20 @@
       "receiptImage": "data/receipts/1790918431568.jpg",
       "processed": true,
       "processedAt": "2026-10-05T13:22:54.240Z"
+    },
+    {
+      "id": 1792202855050,
+      "submittedAt": "2026-10-17T02:07:35.050Z",
+      "applicantName": "Lai pui yi",
+      "phone": "95567208",
+      "sectionId": "cub",
+      "sectionName": "幼童軍",
+      "purpose": "副隊長章，隊長章",
+      "amount": 100,
+      "chequePayee": "Lai pui yi",
+      "receiptImage": "data/receipts/1792202855050.jpg",
+      "processed": false,
+      "processedAt": null
     }
   ],
   "usefulLinks": [
