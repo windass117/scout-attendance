@@ -2469,6 +2469,20 @@
       "receiptImage": "data/receipts/1792202855050.jpg",
       "processed": false,
       "processedAt": null
+    },
+    {
+      "id": 1792575686615,
+      "submittedAt": "2026-10-21T09:41:26.615Z",
+      "applicantName": "馮耀康",
+      "phone": "63085633",
+      "sectionId": "scout",
+      "sectionName": "童軍",
+      "purpose": "獨木舟活動",
+      "amount": 3460,
+      "chequePayee": "FUNG YIU HONG",
+      "receiptImage": "data/receipts/1792575686615.jpg",
+      "processed": false,
+      "processedAt": null
     }
   ],
   "usefulLinks": [
