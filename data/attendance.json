@@ -740,11 +740,13 @@
     },
     "grasshopper": {
       "members": [
-        "夏苡芯"
+        "夏苡芯",
+        "陳玥臻"
       ],
       "dates": [],
       "attendance": {
-        "夏苡芯": {}
+        "夏苡芯": {},
+        "陳玥臻": {}
       },
       "withdrawnMembers": []
     }
