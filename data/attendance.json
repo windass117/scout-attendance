@@ -739,9 +739,13 @@
       ]
     },
     "grasshopper": {
-      "members": [],
+      "members": [
+        "夏苡芯"
+      ],
       "dates": [],
-      "attendance": {},
+      "attendance": {
+        "夏苡芯": {}
+      },
       "withdrawnMembers": []
     }
   },
