@@ -2621,6 +2621,12 @@
       "url": "https://www.scout.org.hk/uploads/tc/forms/18537/pt03.pdf",
       "description": "活動/訓練班報名表",
       "createdAt": "2026-07-24T09:19:05.384Z"
+    },
+    {
+      "id": 1794219465890,
+      "url": "https://tms.scout.org.hk/member/login",
+      "description": "歡迎使用訓練管理系統",
+      "createdAt": "2026-11-09T10:17:45.890Z"
     }
   ],
   "membershipFees": {
