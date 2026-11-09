@@ -2627,6 +2627,12 @@
       "url": "https://tms.scout.org.hk/member/login",
       "description": "歡迎使用訓練管理系統",
       "createdAt": "2026-11-09T10:17:45.890Z"
+    },
+    {
+      "id": 1794219500171,
+      "url": "https://ymis.scout.org.hk/#/Main",
+      "description": "香港童軍總會 青少年成員資訊系統",
+      "createdAt": "2026-11-09T10:18:20.171Z"
     }
   ],
   "membershipFees": {
