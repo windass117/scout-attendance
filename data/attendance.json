@@ -2617,8 +2617,8 @@
       "amount": 3460,
       "chequePayee": "FUNG YIU HONG",
       "receiptImage": "data/receipts/1792575686615.jpg",
-      "processed": false,
-      "processedAt": null
+      "processed": true,
+      "processedAt": "2026-11-21T03:43:24.415Z"
     },
     {
       "id": 1792750323480,
